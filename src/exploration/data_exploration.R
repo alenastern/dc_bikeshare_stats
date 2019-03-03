@@ -1,0 +1,16 @@
+library(lubridate)
+library(tidyverse)
+library(readxl)
+library(scales)
+library(devtools)
+library(aidtools)
+library(here)
+library(dplyr)
+library(treemapify)
+library(grid)
+library(gridExtra)
+library(ggplot2)
+
+source(here("get_data.R"))
+
+bl_dc %>% group_by(LICENSE_CATEGORY_TEXT) %>% summarise(count = n())
