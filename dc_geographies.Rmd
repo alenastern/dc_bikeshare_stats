@@ -1,0 +1,70 @@
+---
+title: "DC geographies"
+output: html_notebook
+---
+
+
+```{r}
+library('geojsonR')
+library('geojsonsf')
+library('sf')
+library('dplyr')
+```
+
+```{r}
+# Files
+
+# 1. These are the neighborhood tracts, georeferrenced: 
+# 1.1
+file_t = paste0('https://opendata.arcgis.com/datasets/6969dd63c5cb4d6aa32f15effb8311f3_8.geojson') 
+download.file(file_t,destfile='neighb_tracts.geojson')
+tracts_sf =  st_read('neighb_tracts.geojson')
+tracts_sf <- st_as_sf(tracts_sf)
+
+# 1.2
+file_bg = paste0('https://opendata.arcgis.com/datasets/c143846b7bf4438c954c5bb28e5d1a21_2.geojson')
+download.file(file_bg,destfile='neighb_bg.geojson')
+blockgroup_sf =  st_read('neighb_bg.geojson')
+blockgroup_sf <- st_as_sf(blockgroup_sf)
+# Its geography seems to be a list of polygons corresponding to tracts so instead of doint the spatial join at the bloc level, I'll do the join of block with polygon and from there the spatial join and group by by block. 
+
+
+
+
+# 2. These are the bike stations, georeferrenced: 
+# ------FROM OPENDATA.ORG; CONTAIN ALL BIKE STATIONS EXISTING TODAY
+file_location = paste0('https://opendata.arcgis.com/datasets/a1f7acf65795451d89f0a38565a975b3_5.geojson')
+download.file(file_location, destfile='location_bikes.geojson')
+locationbikes_sf =  st_read('location_bikes.geojson')
+locationbikes_sf = subset(locationbikes_sf, select = c(LATITUDE, LONGITUDE, TERMINAL_NUMBER, ADDRESS))  
+locationbikes_sf <- locationbikes_sf %>% rename("station_id" = "TERMINAL_NUMBER")
+
+# 3. Running Rina's code for getting bike staitons - data dataframe:
+# -----NOT USING RIGHT NOW BECAUSE THIS IS ONLY 2010-2011 DATA; 
+stations_fr <- data.frame(stations) 
+stations_fr <- stations_fr %>% rename("station_id" = "X1") %>% rename("address" = "X2")
+stations_latlon = left_join(stations_fr, locationbikes_sf, by = "station_id")
+stations_latlon <- st_as_sf(stations_latlon)
+
+rm(stations_fr)
+rm(file_location)
+rm(file_t)
+rm(file_bg)
+
+# 4. Determine which points fall inside which polygons; 
+# -----CURRENTLY USING DATA FROM POINT 1 AND 2
+
+# 4.1 Counts per tracts
+join_ptracts <- st_join(tracts_sf, locationbikes_sf, join = st_contains)
+counts_ptracts <- join_ptracts %>% filter(!is.na(station_id)) %>% group_by(TRACT) %>% summarise(n = n())
+table(counts_ptracts$n) # From 179 existing tracts, we have information about 123 containing bike stations; 
+sum(counts_ptracts$n) # 290 of the bikes fall within the polgygons from the tracts; we are supposed to have 532 bike locations; 
+                      # Could it be that something is wrong with the spatial join, or maybe many bike stations fall outside of DC tracts 
+                      # and are either in Maryland or Virginia.
+
+
+# 4.2 Counts per block group
+join_pblockg <- st_join(blockgroup_sf, locationbikes_sf, join = st_intersects)
+counts_pblockg <- join_pblockg %>% filter(!is.na(station_id))  %>%  group_by(GEOID) %>% summarise(n = n())  # From 450, it looks like there are   bike stations in 175 block groups; again, with 290 of the bikes falling within these polygons
+table(counts_pblockg$n)
+```
