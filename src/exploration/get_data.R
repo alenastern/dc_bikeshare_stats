@@ -12,6 +12,9 @@ library(gridExtra)
 library(ggplot2)
 library(ggmap)
 library(zipcode)
+library(geojsonR)
+library(geojsonsf)
+library(sf)
 
 
 ### Exploring new PPD database + Geocoded World Bank data ###
@@ -33,6 +36,17 @@ bl_merge <- merge(x=bl_dc,y=zipcode, on = "zip", all.x = TRUE)
 bl_merge$LATITUDE[is.na(bl_merge$LATITUDE)] <- bl_merge$latitude[is.na(bl_merge$LATITUDE)]
 bl_merge$LONGITUDE[is.na(bl_merge$LONGITUDE)] <- bl_merge$longitude[is.na(bl_merge$LONGITUDE)]
 
+# download blockgroup file
+file_bg = paste0('https://opendata.arcgis.com/datasets/c143846b7bf4438c954c5bb28e5d1a21_2.geojson')
+download.file(file_bg,destfile='neighb_bg.geojson')
+blockgroup_sf =  st_read('neighb_bg.geojson')
+blockgroup_sf <- st_as_sf(blockgroup_sf)
+blockgroup_sf <- blockgroup_sf %>% select(OBJECTID, TRACT, BLKGRP, GEOID, geometry)
+
+bl_merge_coord <- bl_merge %>% filter(!is.na(LATITUDE))
+bl_sf = st_as_sf(bl_merge_coord, coords = c("LONGITUDE", "LATITUDE"), crs = 4326, agr = "constant")
+
+bl_bg <- st_join(bl_sf, blockgroup_sf, left = TRUE, join = st_within)
   
 ### Get Bikeshare Data ###
 data = NULL
