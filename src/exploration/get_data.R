@@ -15,10 +15,21 @@ library(zipcode)
 library(geojsonR)
 library(geojsonsf)
 library(sf)
+library(rjson)
 
 
 ### Read in Basic Business License Data ###
-bl <- read.csv(here("data","Basic_Business_Licenses.csv"), header = TRUE, sep= ",", fill = TRUE)
+
+
+#as geojson
+file_t = paste0('https://opendata.arcgis.com/datasets/85bf98d3915f412c8a4de706f2d13513_0.geojson')
+download.file(file_t,destfile='business_licenses.geojson')
+bl_raw =  st_read('business_licenses.geojson')
+bl <- bl_raw
+st_geometry(bl) <- NULL
+
+# as csv
+#bl <- read.csv(here("data","Basic_Business_Licenses.csv"), header = TRUE, sep= ",", fill = TRUE)
 
 # we use start date as this is presumably the date that citizens would be able to patronizeinst the business
 bl$start_date <- substr(bl$LICENSE_ISSUE_DATE, 1, 10)
