@@ -1,0 +1,67 @@
+---
+title: "Analysis"
+output: html_document
+---
+
+```{r}
+
+### 1. Import complete dataframes (or run scripts to get clean data) 
+
+```
+
+
+```{r}
+
+### 2. Split the data (temporaly?)
+
+set.seed(1234); 
+
+n = length(nonspam) 
+samp = sample(n,200) 
+
+train = samp[1:100] 
+val = samp[101:200]
+Xtrain = X[train,] 
+ytrain = y[train]
+Xval = X[val,]
+yval = y[val]
+Xtest = X[-samp,]
+ytest = y[-samp] 
+
+```
+
+```{r}
+
+# We can add more models here 
+
+## LINEAR REGRESSION (SIMPLE EXAMPLE)
+coef_lm = lm(ytrain~Xtrain)$coef 
+lm = list(name = "coef_lm", b0 = coef_lm[1], b = coef_lm[-1])
+
+## LASSO 
+lamb_ = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, type.measure = "deviance", alpha = 1, n = 10)$lambda.min
+trained_lasso = glmnet(x = Xtrain, y = ytrain,  alpha = 1, lambda = lamb_) 
+coef_lasso = coef(trained_lasso)
+lasso = list(name = "coef_lasso", b0 = coef_lasso[1], b = coef_lasso[-1])
+
+## RIDGE
+lamb_ = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, type.measure = "deviance", alpha = 0, n = 10)$lambda.min
+trained_ridge = glmnet(x = Xtrain, y = ytrain,  alpha = 0, lambda = lamb_) 
+coef_ridge = coef(trained_ridge)
+ridge = list(name = "coef_ridge", b0 = coef_ridge[1], b = coef_ridge[-1])
+
+# POISSON 
+lamb_ = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, family = "poisson", n = 10)$lambda.min
+trained_poison = glmnet(Xtrain, ytrain, family = "poisson", lambda = lamb_)
+coef_poisson = coef(trained_poison)
+poisson = list(name = "coef_poiss", b0 = coef_poisson[1], b = coef_poisson[-1])
+
+```
+
+```{r}
+for (model in list(lm, lasso, ridge, poisson)){
+  # Run analysis on results foe each model 
+}
+  
+```
+
