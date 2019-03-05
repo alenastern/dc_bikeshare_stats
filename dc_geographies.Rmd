@@ -28,9 +28,6 @@ blockgroup_sf =  st_read('neighb_bg.geojson')
 blockgroup_sf <- st_as_sf(blockgroup_sf)
 # Its geography seems to be a list of polygons corresponding to tracts so instead of doint the spatial join at the bloc level, I'll do the join of block with polygon and from there the spatial join and group by by block. 
 
-
-
-
 # 2. These are the bike stations, georeferrenced: 
 # ------FROM OPENDATA.ORG; CONTAIN ALL BIKE STATIONS EXISTING TODAY
 file_location = paste0('https://opendata.arcgis.com/datasets/a1f7acf65795451d89f0a38565a975b3_5.geojson')
@@ -68,3 +65,15 @@ join_pblockg <- st_join(blockgroup_sf, locationbikes_sf, join = st_intersects)
 counts_pblockg <- join_pblockg %>% filter(!is.na(station_id))  %>%  group_by(GEOID) %>% summarise(n = n())  # From 450, it looks like there are   bike stations in 175 block groups; again, with 290 of the bikes falling within these polygons
 table(counts_pblockg$n)
 ```
+
+
+```{r}
+# Collapsing data per day/month
+data$date = as.Date(data$Start.date, "%Y-%m-%d %H:%M:%S")
+data$day = day(data$date)
+data$month = month(data$date)
+data$year = year(data$date)
+data_collapsed <- data %>% group_by(Start.station.number, End.station.number, month, year) %>% summarise(n_rides = n(), avg_duration = mean(Duration))
+
+```
+
