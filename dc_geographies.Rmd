@@ -75,5 +75,9 @@ data$month = month(data$date)
 data$year = year(data$date)
 data_collapsed <- data %>% group_by(Start.station.number, End.station.number, month, year) %>% summarise(n_rides = n(), avg_duration = mean(Duration))
 
+stations_latlon$station_id = as.numeric(stations_latlon$station_id)
+data_collapsed <- left_join(data_collapsed, stations_latlon, by = c("Start.station.number"  = "station_id"))
+data_collapsed <- left_join(data_collapsed, stations_latlon, by = c("End.station.number" = "station_id"), suffix = c(".start", ".end"))
+left_join()
 ```
 
