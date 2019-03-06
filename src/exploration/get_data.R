@@ -1,9 +1,9 @@
 library(lubridate)
 library(tidyverse)
+library(reshape)
 library(readxl)
 library(scales)
 library(devtools)
-# library(aidtools)
 library(here)
 library(dplyr)
 library(treemapify)
@@ -17,9 +17,10 @@ library(geojsonsf)
 library(sf)
 library(rjson)
 library(zoo)
+
 # Working directory 
 
-setwd("~/Desktop/UChi/Classes/Stats/MultipleTesting_ModernInference/project_bikeshare/dc_bikeshare_stats/src/exploration/") #Cris' directory
+#setwd("~/Desktop/UChi/Classes/Stats/MultipleTesting_ModernInference/project_bikeshare/dc_bikeshare_stats/src/exploration/") #Cris' directory
 
 # ---- 1. Download block group geographies ---- #
 file_bg = paste0('https://opendata.arcgis.com/datasets/c143846b7bf4438c954c5bb28e5d1a21_2.geojson')
@@ -68,14 +69,14 @@ locationbikes_sf <- locationbikes_sf %>% rename("station_id" = "TERMINAL_NUMBER"
 
 # ---- 4. Read in bike rides information  ---- #
 # 4.1 Note: running Rina's code 
-source("getdata_bikeshare.R")
+source(here("getdata_bikeshare.R"))
  
 # 4.2 Collapse at the month - year level
 data$date = as.Date(data$Start.date, "%Y-%m-%d %H:%M:%S")
 data$start_day = day(data$date)
 data$start_month = month(data$date)
 data$start_year = year(data$date)
-df$month_yr <- format(as.Date(data$date),"%Y-%m")
+data$month_yr <- format(as.Date(data$date),"%Y-%m")
 data_collapsed <- data %>% group_by(Start.station.number, End.station.number, start_month, start_year, month_yr) %>% summarise(n_rides = n(), avg_duration = mean(Duration))
 
 # 4.3 Used stations
@@ -112,20 +113,21 @@ bl_bg_grouped <- as.data.frame(bl_bg_grouped)
 total_data <- left_join(biketrips_bg, bl_bg_grouped,  by = c("GEOID", "start_month", "start_year"))
 total_data$date <- as.yearmon(paste(total_data$start_year, total_data$start_month), "%Y %m")
 
+# we have 1 row in bl_bg_grouped that is NA and ~7600 rows in biketrips_bg that are null, seems a couple of stationsd didn't merge
 
 # RESHAPING 
 
 # We're looking at how many people ride to a station, so keep only End_station as identifier, and group at this level
-total_data_temp <- subset(total_data, select = c(date, n_rides, n_bl, End.station.number))
-total_data_temp_rides <- total_data_temp %>% group_by(date, End.station.number) %>% summarise(n_rides_tot = sum(n_rides) )
-total_data_temp_bl <- total_data_temp %>% group_by(date, End.station.number) %>% summarise(n_bl_tot = sum(n_bl))
+total_data_temp <- subset(total_data, select = c(date, n_rides, n_bl, GEOID))
+total_data_temp_rides <- total_data_temp %>% group_by(date, GEOID) %>% summarise(n_rides_tot = sum(n_rides) )
+total_data_temp_bl <- total_data_temp %>% group_by(date, GEOID) %>% summarise(n_bl_tot = sum(n_bl))
 
 reshape_nrides <- spread(total_data_temp_rides, key = date, value = n_rides_tot, fill = 0)
 reshape_bl <- spread(total_data_temp_bl, key = date, value = n_bl_tot, fill = 0)
-reshaped_all<- left_join(reshape_nrides, reshape_bl, by = c("End.station.number"), suffix = c(".nrides", ".nbl"))
+reshaped_all<- left_join(reshape_nrides, reshape_bl, by = c("GEOID"), suffix = c(".nrides", ".nbl"))
 
-left_join()
-
+#left_join()
+#reshaped_all has 86 rows when we keep GEOID. This matches the number of unique GEOIDs in biketrips_bg
 
 
 
@@ -163,5 +165,3 @@ rm(file_bg)
 
 
 
-### 
-  
