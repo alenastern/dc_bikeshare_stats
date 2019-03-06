@@ -2,7 +2,17 @@
 library(jsonlite)
 library(dplyr)
 
-get_census_data <- function(link, variables, for_equal, in_equal, key){
+#global variables
+vars <- read.csv("/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/src/exploration/variables.csv") #change this to where you save the variables.
+vars.to.add <- c('state', 'county', 'tract', 'block_group')
+link <- 'https://api.census.gov/data/2015/acs/acs5'
+for_equal <- 'block%20group:*'
+in_equal_state <- 'state:11'
+in_equal_county <- 'county:001'
+in_equal_tract <- 'tract:*'
+key <- '17c33afc69e74a76256559f11768a4005763e816' #CHANGE THIS TO YOUR KEY
+
+get_census_data <- function(link, variables, for_equal, in_equal_county, in_equal_state, in_equal_tract, key){
   # gets census data through the census api
   #   
   #   inputs
@@ -26,30 +36,56 @@ header.true <- function(df) {
   df[-1,]
 }
 
-create.dfs <- function(){
-  # FILL ME IN.
+create.dfs <- function(topic, vars.df, vars.df.col, link, for_equal, in_equal_county, in_equal_state, in_equal_tract, key, vars.to.add){
+  print(topic)
+  
+  if (topic == "age"){
+    a <- vars.df[grep(topic, vars.df.col), ]
+    rownames(a) <- 1:nrow(a)
+    a.1 <- a[1:24,]
+    a.1 <- rbind(c("NAME", "name"), a.1)
+    a.vars.1 <- paste(a.1$acs, collapse = ",")
+    a.df.1 <- get_census_data(link, a.vars.1, for_equal, in_equal_county, in_equal_state, in_equal_tract, key)
+    a.df.1 <- header.true(a.df.1)
+    a.cols.1 <- as.vector(a.1$local)
+    a.cols.1 <- c(a.cols.1, vars.to.add)
+    names(a.df.1) <- a.cols.1
+    
+    a.2 <- a[25:nrow(a),]
+    a.2 <- rbind(c("NAME", "name"), a.2)
+    a.vars.2 <- paste(a.2$acs, collapse = ",")
+    a.df.2 <- get_census_data(link, a.vars.2, for_equal, in_equal_county, in_equal_state, in_equal_tract, key)
+    a.df.2 <- header.true(a.df.2)
+    a.cols.2 <- as.vector(a.2$local)
+    a.cols.2 <- c(a.cols.2, vars.to.add)
+    names(a.df.2) <- a.cols.2
+    a.df <- merge(a.df.1, a.df.2, by = c("name", vars.to.add), all.x = TRUE)
+    
+    return(a.df)
+  }
+  else{
+    a <- vars.df[grep(topic, vars.df.col), ]
+    a <- rbind(c("NAME", "name"), a)
+    a.vars <- paste(a$acs, collapse = ",")
+    a.df <- get_census_data(link, a.vars, for_equal, in_equal_county, in_equal_state, in_equal_tract, key)
+    a.df <- header.true(a.df)
+    a.cols <- as.vector(a$local)
+    a.cols <- c(a.cols, vars.to.add)
+    names(a.df) <- a.cols
+    return(a.df)
+  }
 }
 
-#global variables
-vars <- read.csv("/mnt/dm-3/alix/Documents/Multiple Testing/variables.csv")
-vars.to.add <- c('state', 'county', 'tract', 'block_group')
-link <- 'https://api.census.gov/data/2015/acs/acs5'
-for_equal <- 'block%20group:*'
-in_equal_state <- 'state:11'
-in_equal_county <- 'county:001'
-in_equal_tract <- 'tract:*'
-key <- '17c33afc69e74a76256559f11768a4005763e816'
+topics <- c("race", "age", "ethnic", "income", "time")
+
+df.m <- data.frame(matrix(nrow=0, ncol=5))
+colnames(df.m) <- c("name", vars.to.add)
+
+for (t in topics){
+  df <- create.dfs(t, vars, vars$local, link, for_equal, in_equal_county, in_equal_state, in_equal_tract, key, vars.to.add)
+  df.m <- merge(df.m, df, by = c("name", vars.to.add), all.y = TRUE)
+}
 
 
 
-race <- vars[grep("race", vars$local), ]
-race <- rbind(c("NAME", "name"), race)
-race.vars <- paste(race$acs, collapse = ",")
 
-race.df <- get_census_data(link, race.vars, for_equal, in_equal, key)
-
-race.df <- header.true(race.df)
-race.cols <- as.vector(race$local)
-race.cols <- c(race.cols, vars.to.add)
-names(race.df) <- race.cols
-df <- merge(race.df, age.1.df)
