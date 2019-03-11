@@ -2,11 +2,9 @@
 library(jsonlite)
 library(dplyr)
 
-p <- getwd() #make sure the variables file is in the same folder this code is in.
-p <- paste0(p, "/variables.csv")
 
 #global variables
-vars <- read.csv(p)
+vars <- read.csv("/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/src/exploration/variables.csv") # change to wherever you save variables.csv
 vars.to.add <- c('state', 'county', 'tract', 'block_group')
 link <- 'https://api.census.gov/data/2015/acs/acs5'
 for_equal <- 'block%20group:*'
@@ -14,6 +12,7 @@ in_equal_state <- 'state:11'
 in_equal_county <- 'county:001'
 in_equal_tract <- 'tract:*'
 key <-  '17c33afc69e74a76256559f11768a4005763e816' #CHANGE THIS TO YOUR KEY; format is 'xxxxxxxxxxxxxxx...'
+topics <- c("race", "age", "ethnic", "income", "time")
 
 get_census_data <- function(link, variables, for_equal, in_equal_county, in_equal_state, in_equal_tract, key){
   
@@ -108,9 +107,6 @@ create.dfs <- function(topic, vars.df, vars.df.col, link, for_equal, in_equal_co
   return(df.m)
 }
 
-topics <- c("race", "age", "ethnic", "income", "time")
 df <- create.dfs(topics, vars, vars$local, link, for_equal, in_equal_county, in_equal_state, in_equal_tract, key, vars.to.add)
 
-
-
-
+is.na(df)
