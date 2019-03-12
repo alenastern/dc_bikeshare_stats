@@ -12,7 +12,7 @@ in_equal_state <- 'state:11'
 in_equal_county <- 'county:001'
 in_equal_tract <- 'tract:*'
 key <-  '17c33afc69e74a76256559f11768a4005763e816' #CHANGE THIS TO YOUR KEY; format is 'xxxxxxxxxxxxxxx...'
-topics <- c("race", "age", "ethnic", "income", "time")
+topics <- c("race", "age", "income")
 
 get_census_data <- function(link, variables, for_equal, in_equal_county, in_equal_state, in_equal_tract, key){
   
@@ -100,7 +100,7 @@ create.dfs <- function(topic, vars.df, vars.df.col, link, for_equal, in_equal_co
     else{ # anything but age
       a <- vars.df[grep(t, vars.df.col), ] # get only the variable names that start with the topic we're interested in
       a.df <- get.data(a, link, for_equal, in_equal_county, in_equal_state, in_equal_tract, key)
-      #return(a.df)
+      #print(a.df)
     }
     df.m <- merge(df.m, a.df, by = c("name", vars.to.add), all.y = TRUE)
   }
@@ -109,4 +109,34 @@ create.dfs <- function(topic, vars.df, vars.df.col, link, for_equal, in_equal_co
 
 df <- create.dfs(topics, vars, vars$local, link, for_equal, in_equal_county, in_equal_state, in_equal_tract, key, vars.to.add)
 
-is.na(df)
+keep <- c("name", "county", "state", "tract", "block_group")
+indx <- !(colnames(df) %in% keep)
+df.new <- lapply(df[indx], function(x) as.numeric(as.character(x)))
+df.new <- cbind(df[keep], df.new)
+
+df.mutated <- df.new %>%
+  mutate(race_white = race_white_alone,
+        race_black = race_black_alone,
+        race_asian = race_asian_alone,
+        race_other = race_native_hawaiian_other_pacific_islander_alone + race_american_indian_alaska_native_alone + race_some_other_race_alone + race_two_or_more,
+        male = age_total_male,
+        female = age_total_female,
+        median_age = age_median,
+        age_under18 = age_male_under5 + age_male_5to9 + age_male_10to14 + age_male_15to17 + age_female_under5 + age_female_5to9 + age_female_10to14 + age_female_15to17,
+        age_18to24 = age_male_18to19 + age_male_20 + age_male_21 + age_male_22to24 + age_female_18to19 + age_female_20 + age_female_21 + age_female_22to24,
+        age_25to34 = age_male_25to29 + age_male_30to34 + age_female_25to29 + age_female_30to34,
+        age_35to44 = age_male_35to39 + age_male_40to44 + age_female_35to39 + age_female_40to44,
+        age_45to54 = age_male_45to49 + age_male_50to54 + age_female_45to49 + age_female_50to54,
+        age_55to64 = age_male_55to59 + age_male_60to61 + age_male_62to64 + age_female_55to59 + age_female_60to61 + age_female_62to64,
+        age_65up = age_male_65to66 + age_male_67to69 + age_male_70to74 + age_male_75to79 + age_male_80to84 + age_male_85plus + age_female_65to66 + age_female_67to69 + age_female_70to74 + age_female_75to79 + age_female_80to84 + age_female_85plus,
+        income_less_than_30k = `income_<10k` + income_10to14.9k + income_15to19.9k + income_20to24.9k + income_25to29.9k,
+        income_30to59k = income_30to34.9k + income_35to39.9k + income_40to44.9k + income_45to49.9k + income_50to59.9k,
+        income_60to99k = income_60to74.9k + income_75to99.9k,
+        income_100up = income_100to124.9k + income_125to149.9k + income_150to199.9k + `income_200k+`)
+
+df.final <- df.mutated[, -c(6:80)]
+
+# Race: White non-Hispanic = race_white, Black non-Hispanic = race_black_alone, Asian non-Hispanic = race_asian_alone, Other non-Hispanic. 
+# Income: <$29.9k, $30-59.9k, $60-99.9k, $100k+. 
+# Gender: Male, Female. 
+# Age: Under 18, 18 to 24, 25 to 34, 35 to 44, 45 to 54, 55 to 64, 64+, median age. 

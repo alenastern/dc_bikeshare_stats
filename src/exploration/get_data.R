@@ -1,3 +1,4 @@
+
 library(lubridate)
 library(reshape)
 library(tidyverse)
@@ -69,7 +70,7 @@ locationbikes_sf <- locationbikes_sf %>% rename("station_id" = "TERMINAL_NUMBER"
 
 # ---- 4. Read in bike rides information  ---- #
 # 4.1 Note: running Rina's code 
-source(here("getdata_bikeshare.R"))
+source("/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/src/exploration/getdata_bikeshare.R")
  
 # 4.2 Collapse at the month - year level
 data$date = as.Date(data$Start.date, "%Y-%m-%d %H:%M:%S")
@@ -156,12 +157,8 @@ rm(file_location)
 rm(file_t)
 rm(file_bg)
 
-# 4.3 Bike trips & stations with Business Licenses 
+# get acs data
 
-
-# to think about
-# how to incorporate License Status
-# how to incorporate license category
-
+source("/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/src/exploration/ACS data.R")
 
 
