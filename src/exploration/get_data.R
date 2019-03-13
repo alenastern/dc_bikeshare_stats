@@ -113,8 +113,7 @@ bl_bg_grouped <- as.data.frame(bl_bg_grouped)
 
 total_data <- left_join(biketrips_bg, bl_bg_grouped,  by = c("GEOID", "start_month", "start_year"))
 total_data$date <- as.yearmon(paste(total_data$start_year, total_data$start_month), "%Y %m")
-total_data_panel <- subset(total_data, select = c(start_year, start_month, date, n_rides, n_bl, GEOID))
-total_data_panel <- total_data_h2  %>% group_by(date, GEOID) %>% summarise(n_rides_tot = sum(n_rides), n_bl_tot = sum(n_bl))
+
 # we have 1 row in bl_bg_grouped that is NA and ~7600 rows in biketrips_bg that are null, seems a couple of stationsd didn't merge
 
 # RESHAPING 
