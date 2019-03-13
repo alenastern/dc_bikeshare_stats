@@ -20,7 +20,7 @@ library(zoo)
 
 # Working directory 
 
-#setwd("~/Desktop/UChi/Classes/Stats/MultipleTesting_ModernInference/project_bikeshare/dc_bikeshare_stats/src/exploration/") #Cris' directory
+setwd("~/Desktop/UChi/Classes/Stats/MultipleTesting_ModernInference/project_bikeshare/dc_bikeshare_stats/src/exploration/") #Cris' directory
 
 # ---- 1. Download block group geographies ---- #
 file_bg = paste0('https://opendata.arcgis.com/datasets/c143846b7bf4438c954c5bb28e5d1a21_2.geojson')
@@ -69,8 +69,9 @@ locationbikes_sf <- locationbikes_sf %>% rename("station_id" = "TERMINAL_NUMBER"
 
 # ---- 4. Read in bike rides information  ---- #
 # 4.1 Note: running Rina's code 
-source(here("getdata_bikeshare.R"))
- 
+source(("getdata_bikeshare.R"))
+#source(here("getdata_bikeshare.R")) 
+
 # 4.2 Collapse at the month - year level
 data$date = as.Date(data$Start.date, "%Y-%m-%d %H:%M:%S")
 data$start_day = day(data$date)
@@ -112,12 +113,14 @@ bl_bg_grouped <- as.data.frame(bl_bg_grouped)
 
 total_data <- left_join(biketrips_bg, bl_bg_grouped,  by = c("GEOID", "start_month", "start_year"))
 total_data$date <- as.yearmon(paste(total_data$start_year, total_data$start_month), "%Y %m")
-
+total_data_panel <- subset(total_data, select = c(start_year, start_month, date, n_rides, n_bl, GEOID))
+total_data_panel <- total_data_h2  %>% group_by(date, GEOID) %>% summarise(n_rides_tot = sum(n_rides), n_bl_tot = sum(n_bl))
 # we have 1 row in bl_bg_grouped that is NA and ~7600 rows in biketrips_bg that are null, seems a couple of stationsd didn't merge
 
 # RESHAPING 
 
 # We're looking at how many people ride to a station, so keep only End_station as identifier, and group at this level
+
 total_data_temp <- subset(total_data, select = c(date, n_rides, n_bl, GEOID))
 total_data_temp_rides <- total_data_temp %>% group_by(date, GEOID) %>% summarise(n_rides_tot = sum(n_rides) )
 total_data_temp_bl <- total_data_temp %>% group_by(date, GEOID) %>% summarise(n_bl_tot = sum(n_bl))
@@ -128,8 +131,6 @@ reshaped_all<- left_join(reshape_nrides, reshape_bl, by = c("GEOID"), suffix = c
 
 #left_join()
 #reshaped_all has 86 rows when we keep GEOID. This matches the number of unique GEOIDs in biketrips_bg
-
-
 
 # Clean up environment: 
 rm(biketrips_bg)
