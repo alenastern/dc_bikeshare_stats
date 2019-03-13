@@ -1,5 +1,64 @@
+
+# Set Working Directory
+
+setwd("~/Desktop/UChi/Classes/Stats/MultipleTesting_ModernInference/project_bikeshare/dc_bikeshare_stats/src/exploration/") #Cris' directory
+
+source(here("src/exploration","get_data.R"))
+source(here("src/exploration","data_timelags.R"))
+
 ### Step 1: Split Data into Training, Validation, Testing Sets ###
 
+train_test_split <- function(data, y_var, bg){
+  # data = data frame
+  # y_var = dependent variable
+  # bg = boolean, whether randomizing on block group
+ 
+  # Case when not randomizing on block group 
+  if(bg == TRUE) {
+    X <- data %>% select(-y_var)
+    y <- data[[y_var]]
+    
+    ### sample observations across BG/Months
+    n = length(X)
+    pct_train_val = .5
+    num_samp = n*pct_train_val
+    set.seed(2019); samp = sample(n,num_samp) 
+    train = samp[1:(num_samp/2)] # these observations will be used as a training data set
+    val = samp[(num_samp/2 + 1):num_samp] # these observations will be used as a validation set
+    Xtrain = X[train,]; ytrain = y[train]
+    Xval = X[val,]; yval = y[val]
+    Xtest = X[-samp,]; ytest = y[-samp] # the remaining n*(1-pct_train_val) observations are the test set
+  } else {
+
+  ### sample BGs, take all months for each BG ###
+
+    unique_geo <- unique(as.vector(data$GEOID))
+    n = length(unique_geo)
+    pct_train_val = .5
+    num_samp = ceiling(n*pct_train_val)
+    set.seed(2019); samp = sample(n,num_samp) 
+    train = samp[1:ceiling(num_samp/2)] # these GEOIDs will be used as a training data set
+    val = samp[(ceiling(num_samp/2) + 1):num_samp] # these GEOIDs will be used as a validation set
+    train_geo = unique_geo[train]; val_geo = unique_geo[val]; train_val_geo = append(train_geo, val_geo)
+    train_set = data[data$GEOID %in% train_geo,]
+    val_set = data[data$GEOID %in% val_geo,]
+    test_set = data[!data$GEOID %in% train_val_geo, ]
+    
+  # reduce(union, list(unique(as.vector(train_set$GEOID)), unique(as.vector(val_set$GEOID)), unique(as.vector(test_set$GEOID))))
+  # reduce(intersect, list(unique(as.vector(train_set$GEOID)), unique(as.vector(val_set$GEOID)), unique(as.vector(test_set$GEOID))))
+  # identify no GEOIDs in common and 85 in union
+
+    Xtrain <- train_set[ , ! colnames(train_set) %in% c(y_var) ]
+    #Xtrain <- train_set %>% select(-y_var)
+    ytrain <- train_set[[y_var]]
+    Xval <- val_set[ , ! colnames(val_set) %in% c(y_var) ]
+    yval <- train_set[[y_var]]
+    Xtest <- test_set[ , ! colnames(test_set) %in% c(y_var) ]
+    ytest <- train_set[[y_var]]
+  }
+  df_list = list(Xtrain, ytrain, Xval, yval, Xtest, ytest)
+  return(df_list) 
+}
 #Q: do we have enough data to do this?
 
 ### Step 2: Define All Variables to Use in Model and Appropriate Model ###
