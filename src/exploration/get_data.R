@@ -91,9 +91,27 @@ stations_latlon <- st_as_sf(stations_latlon)
 # 4.1 Buisness Licenses with bloc group areas: 
 bl_merge_coord <- bl_merge %>% filter(!is.na(LATITUDE))
 bl_sf = st_as_sf(bl_merge_coord, coords = c("LONGITUDE", "LATITUDE"), crs = 4326, agr = "constant")
-
+?
 bl_bg <- st_join(bl_sf, blockgroup_sf, left = TRUE, join = st_within)
-bl_bg_grouped <- bl_bg %>% group_by(GEOID, start_month, start_year) %>% summarise(n_bl = n())
+
+bl_bg <- rename(bl_bg, l_name = LICENSECATEGORY, l_cat = LICENSE_CATEGORY_TEXT )
+
+# set geometry to NULL so spread collapses month/year correctly
+st_geometry(bl_bg) <- NULL
+
+# see codes here: https://dcra.dc.gov/node/514522
+bl_bg_name <- bl_bg %>% group_by(GEOID, start_month, start_year,l_name) %>% summarise(nbl_name = n())
+bl_bg_cat <- bl_bg %>% group_by(GEOID, start_month, start_year, l_cat) %>% summarise(nbl_cat = n())
+
+bl_bg_name <- spread(bl_bg_name, l_name, nbl_name, fill = 0, sep = "_")
+bl_bg_cat <- spread(bl_bg_cat, l_cat, nbl_cat, fill = 0, sep = "_")
+
+bl_bg_all <- merge(bl_bg_cat, bl_bg_name, by = c("GEOID", "start_month", "start_year"))
+names(bl_bg_all) <- gsub(" ", "_", names(bl_bg_all))
+bl_bg_all <- bl_bg_all %>% mutate(total_bl = select(., l_cat_Employment_Services:l_cat_Public_Health_Public_Accomm) %>% rowSums(na.rm = TRUE))
+
+
+#bl_bg_grouped <- bl_bg %>% group_by(GEOID, start_month, start_year) %>% summarise(n_bl = n())
 
 # 4.2 Stations with bike trips:
 stations_latlon$station_id = as.numeric(stations_latlon$station_id)
@@ -109,13 +127,14 @@ rm(biketrips_collapsed)
 # corresponding geography (within the same bloc group)
 
 biketrips_bg <- as.data.frame(biketrips_bg)
-bl_bg_grouped <- as.data.frame(bl_bg_grouped)
+bl_bg_grouped <- as.data.frame(bl_bg_all)
 
-total_data <- left_join(biketrips_bg, bl_bg_grouped,  by = c("GEOID", "start_month", "start_year"))
+total_data <- left_join(biketrips_bg, bl_bg_all,  by = c("GEOID", "start_month", "start_year"))
 total_data$date <- as.yearmon(paste(total_data$start_year, total_data$start_month), "%Y %m")
 total_data_panel <- subset(total_data, select = c(start_year, start_month, date, n_rides, n_bl, GEOID))
 total_data_panel <- total_data_h2  %>% group_by(date, GEOID) %>% summarise(n_rides_tot = sum(n_rides), n_bl_tot = sum(n_bl))
-# we have 1 row in bl_bg_grouped that is NA and ~7600 rows in biketrips_bg that are null, seems a couple of stationsd didn't merge
+# we have 1 row in bl_bg_grouped that is NA and ~7600 rows in biketrips_bg that are null, seems a couple of stations didn't merge
+# we believe these stations represent stations outside of metro DC (eg. in VA or MD) 
 
 # RESHAPING 
 
