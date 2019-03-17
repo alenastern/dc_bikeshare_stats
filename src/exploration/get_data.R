@@ -1,4 +1,12 @@
+################################################################################################################################################
+# Notes - change working directory to the root of our git repository
+#       - change working path of variables file on ACS data file, called by this file. 
 
+# Working directories: 
+  #setwd("/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/src/exploration/") #Alix's directory
+  setwd("~/Desktop/UChi/Classes/Stats/MultipleTesting_ModernInference/project_bikeshare/dc_bikeshare_stats/") #Cris' directory
+
+# Install the following libraries: 
 library(lubridate)
 library(reshape)
 library(tidyverse)
@@ -18,11 +26,11 @@ library(geojsonsf)
 library(sf)
 library(rjson)
 library(zoo)
+################################################################################################################################################
 
-# Working directory 
-
-#setwd("/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/src/exploration/") #Cris' directory
-setwd("~/Desktop/UChi/Classes/Stats/MultipleTesting_ModernInference/project_bikeshare/dc_bikeshare_stats/") #Cris' directory
+#--------------------------------- --------------------------------- --------------------------------- #
+#-----------------------------------------------Get data-----------------------------------------------#
+#--------------------------------- --------------------------------- --------------------------------- #
 
 # ---- 1. Download block group geographies ---- #
 file_bg = paste0('https://opendata.arcgis.com/datasets/c143846b7bf4438c954c5bb28e5d1a21_2.geojson')
