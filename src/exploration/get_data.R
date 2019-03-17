@@ -21,7 +21,8 @@ library(zoo)
 
 # Working directory 
 
-setwd("/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/src/exploration/") #Cris' directory
+#setwd("/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/src/exploration/") #Cris' directory
+setwd("~/Desktop/UChi/Classes/Stats/MultipleTesting_ModernInference/project_bikeshare/dc_bikeshare_stats/") #Cris' directory
 
 # ---- 1. Download block group geographies ---- #
 file_bg = paste0('https://opendata.arcgis.com/datasets/c143846b7bf4438c954c5bb28e5d1a21_2.geojson')
@@ -70,7 +71,7 @@ locationbikes_sf <- locationbikes_sf %>% rename("station_id" = "TERMINAL_NUMBER"
 
 # ---- 4. Read in bike rides information  ---- #
 # 4.1 Note: running Rina's code 
-source("getdata_bikeshare.R")
+source("src/exploration/getdata_bikeshare.R")
 #source(here("getdata_bikeshare.R")) 
 
 # 4.2 Collapse at the month - year level
@@ -130,14 +131,15 @@ rm(biketrips_collapsed)
 biketrips_bg <- as.data.frame(biketrips_bg)
 bl_bg_grouped <- as.data.frame(bl_bg_all)
 
-total_data <- left_join(biketrips_bg, bl_bg_all,  by = c("GEOID", "start_month", "start_year"))
-total_data$date <- as.yearmon(paste(total_data$start_year, total_data$start_month), "%Y %m")
-total_data_panel <- subset(total_data, select = c(start_year, start_month, date, n_rides, total_bl, GEOID))
+biketrips_bg_panel <- subset(biketrips_bg, select = -c(LATITUDE, LONGITUDE, ADDRESS, OBJECTID, TRACT, BLKGRP, geometry, avg_duration))
+biketrips_bg_panel <- biketrips_bg_panel %>% group_by(start_month, start_year, GEOID) %>% summarise(n_rides_tot = sum(n_rides))
 
-#total_data_panel <- total_data_h2  %>% group_by(date, GEOID) %>% summarise(n_rides_tot = sum(n_rides), n_bl_tot = sum(n_bl))
+total_data_panel <- left_join(biketrips_bg_panel,bl_bg_grouped,  by = c("GEOID", "start_month", "start_year"))
 
-total_data_panel <- total_data_panel  %>% group_by(date, GEOID) %>% summarise(n_rides_tot = sum(n_rides), n_bl_tot = sum(total_bl))
 total_data_panel  <- total_data_panel %>% filter(!is.na(GEOID))
+
+total_data_panel$date <- as.yearmon(paste(total_data_panel$start_year, total_data_panel$start_month), "%Y %m")
+
 
 # we have 1 row in bl_bg_grouped that is NA and ~7600 rows in biketrips_bg that are null, seems a couple of stationsd didn't merge
 # we believe these stations represent stations outside of metro DC (eg. in VA or MD) 
@@ -180,7 +182,6 @@ rm(stations_latlon)
 rm(zipcode)
 rm(file_location)
 rm(file_t)
-rm(file_bg)
 
 # create date and geoid dummies to ensure we have all geoids with bikes in them
 df.date.dummies <- unique(total_data_panel$date)
@@ -188,7 +189,8 @@ df.geoid.dummies <- unique(total_data_panel$GEOID)
 dummies <- expand.grid(date = df.date.dummies, GEOID = df.geoid.dummies)
 
 # pull the ACS data
-source("ACS data.R")
+# Need to change working directory from within ACS data to be able to pull ACS data
+source("src/exploration/ACS data.R")
 
 # merge total data panel and acs data, keeping all geoids. 
 df.merge.1 <- merge(dummies, total_data_panel, by=c("GEOID", "date"), all.x = TRUE)
