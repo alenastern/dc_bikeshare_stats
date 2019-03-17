@@ -1,3 +1,4 @@
+
 library(lubridate)
 library(reshape)
 library(tidyverse)
@@ -20,7 +21,7 @@ library(zoo)
 
 # Working directory 
 
-setwd("~/Desktop/UChi/Classes/Stats/MultipleTesting_ModernInference/project_bikeshare/dc_bikeshare_stats/src/exploration/") #Cris' directory
+setwd("/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/src/exploration/") #Cris' directory
 
 # ---- 1. Download block group geographies ---- #
 file_bg = paste0('https://opendata.arcgis.com/datasets/c143846b7bf4438c954c5bb28e5d1a21_2.geojson')
@@ -69,7 +70,7 @@ locationbikes_sf <- locationbikes_sf %>% rename("station_id" = "TERMINAL_NUMBER"
 
 # ---- 4. Read in bike rides information  ---- #
 # 4.1 Note: running Rina's code 
-source(("getdata_bikeshare.R"))
+source("getdata_bikeshare.R")
 #source(here("getdata_bikeshare.R")) 
 
 # 4.2 Collapse at the month - year level
@@ -91,7 +92,7 @@ stations_latlon <- st_as_sf(stations_latlon)
 # 4.1 Buisness Licenses with bloc group areas: 
 bl_merge_coord <- bl_merge %>% filter(!is.na(LATITUDE))
 bl_sf = st_as_sf(bl_merge_coord, coords = c("LONGITUDE", "LATITUDE"), crs = 4326, agr = "constant")
-?
+
 bl_bg <- st_join(bl_sf, blockgroup_sf, left = TRUE, join = st_within)
 
 bl_bg <- rename(bl_bg, l_name = LICENSECATEGORY, l_cat = LICENSE_CATEGORY_TEXT )
@@ -131,11 +132,11 @@ bl_bg_grouped <- as.data.frame(bl_bg_all)
 
 total_data <- left_join(biketrips_bg, bl_bg_all,  by = c("GEOID", "start_month", "start_year"))
 total_data$date <- as.yearmon(paste(total_data$start_year, total_data$start_month), "%Y %m")
-total_data_panel <- subset(total_data, select = c(start_year, start_month, date, n_rides, n_bl, GEOID))
+total_data_panel <- subset(total_data, select = c(start_year, start_month, date, n_rides, total_bl, GEOID))
 
 #total_data_panel <- total_data_h2  %>% group_by(date, GEOID) %>% summarise(n_rides_tot = sum(n_rides), n_bl_tot = sum(n_bl))
 
-total_data_panel <- total_data_panel  %>% group_by(date, GEOID) %>% summarise(n_rides_tot = sum(n_rides), n_bl_tot = sum(n_bl))
+total_data_panel <- total_data_panel  %>% group_by(date, GEOID) %>% summarise(n_rides_tot = sum(n_rides), n_bl_tot = sum(total_bl))
 total_data_panel  <- total_data_panel %>% filter(!is.na(GEOID))
 
 # we have 1 row in bl_bg_grouped that is NA and ~7600 rows in biketrips_bg that are null, seems a couple of stationsd didn't merge
@@ -145,13 +146,13 @@ total_data_panel  <- total_data_panel %>% filter(!is.na(GEOID))
 
 # We're looking at how many people ride to a station, so keep only End_station as identifier, and group at this level
 
-total_data_temp <- subset(total_data, select = c(date, n_rides, n_bl, GEOID))
-total_data_temp_rides <- total_data_temp %>% group_by(date, GEOID) %>% summarise(n_rides_tot = sum(n_rides) )
-total_data_temp_bl <- total_data_temp %>% group_by(date, GEOID) %>% summarise(n_bl_tot = sum(n_bl))
-
-reshape_nrides <- spread(total_data_temp_rides, key = date, value = n_rides_tot, fill = 0)
-reshape_bl <- spread(total_data_temp_bl, key = date, value = n_bl_tot, fill = 0)
-reshaped_all<- left_join(reshape_nrides, reshape_bl, by = c("GEOID"), suffix = c(".nrides", ".nbl"))
+# total_data_temp <- subset(total_data, select = c(date, n_rides, n_bl, GEOID))
+# total_data_temp_rides <- total_data_temp %>% group_by(date, GEOID) %>% summarise(n_rides_tot = sum(n_rides) )
+# total_data_temp_bl <- total_data_temp %>% group_by(date, GEOID) %>% summarise(n_bl_tot = sum(n_bl))
+# 
+# reshape_nrides <- spread(total_data_temp_rides, key = date, value = n_rides_tot, fill = 0)
+# reshape_bl <- spread(total_data_temp_bl, key = date, value = n_bl_tot, fill = 0)
+# reshaped_all<- left_join(reshape_nrides, reshape_bl, by = c("GEOID"), suffix = c(".nrides", ".nbl"))
 
 #left_join()
 #reshaped_all has 86 rows when we keep GEOID. This matches the number of unique GEOIDs in biketrips_bg
@@ -181,12 +182,18 @@ rm(file_location)
 rm(file_t)
 rm(file_bg)
 
-# 4.3 Bike trips & stations with Business Licenses 
+# create date and geoid dummies to ensure we have all geoids with bikes in them
+df.date.dummies <- unique(total_data_panel$date)
+df.geoid.dummies <- unique(total_data_panel$GEOID)
+dummies <- expand.grid(date = df.date.dummies, GEOID = df.geoid.dummies)
 
+# pull the ACS data
+source("ACS data.R")
 
-# to think about
-# how to incorporate License Status
-# how to incorporate license category
+# merge total data panel and acs data, keeping all geoids. 
+df.merge.1 <- merge(dummies, total_data_panel, by=c("GEOID", "date"), all.x = TRUE)
+df.final <- merge(df.merge.1, df.acs, by=c("GEOID"), all.x = TRUE)
 
-
+# change all nas in the file to 0
+df.final[is.na(df.final)] <- 0
 

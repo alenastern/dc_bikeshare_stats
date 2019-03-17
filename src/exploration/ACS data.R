@@ -134,7 +134,12 @@ df.mutated <- df.new %>%
         income_60to99k = income_60to74.9k + income_75to99.9k,
         income_100up = income_100to124.9k + income_125to149.9k + income_150to199.9k + `income_200k+`)
 
-df.final <- df.mutated[, -c(6:80)]
+df.acs <- df.mutated[, -c(6:80)]
+
+df.acs$GEOID <- paste0(df.acs$state, df.acs$county, df.acs$tract, df.acs$block_group)
+
+
+
 
 # Race: White non-Hispanic = race_white, Black non-Hispanic = race_black_alone, Asian non-Hispanic = race_asian_alone, Other non-Hispanic. 
 # Income: <$29.9k, $30-59.9k, $60-99.9k, $100k+. 
