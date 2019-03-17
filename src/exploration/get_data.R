@@ -4,7 +4,7 @@
 
 # Working directories: 
   #setwd("/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/src/exploration/") #Alix's directory
-  setwd("~/Desktop/UChi/Classes/Stats/MultipleTesting_ModernInference/project_bikeshare/dc_bikeshare_stats/") #Cris' directory
+setwd("/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/") #Cris' directory
 
 # Install the following libraries: 
 library(lubridate)
@@ -120,7 +120,6 @@ bl_bg_all <- merge(bl_bg_cat, bl_bg_name, by = c("GEOID", "start_month", "start_
 names(bl_bg_all) <- gsub(" ", "_", names(bl_bg_all))
 bl_bg_all <- bl_bg_all %>% mutate(total_bl = select(., l_cat_Employment_Services:l_cat_Public_Health_Public_Accomm) %>% rowSums(na.rm = TRUE))
 
-
 #bl_bg_grouped <- bl_bg %>% group_by(GEOID, start_month, start_year) %>% summarise(n_bl = n())
 
 # 4.2 Stations with bike trips:
@@ -147,7 +146,6 @@ total_data_panel <- left_join(biketrips_bg_panel,bl_bg_grouped,  by = c("GEOID",
 total_data_panel  <- total_data_panel %>% filter(!is.na(GEOID))
 
 total_data_panel$date <- as.yearmon(paste(total_data_panel$start_year, total_data_panel$start_month), "%Y %m")
-
 
 # we have 1 row in bl_bg_grouped that is NA and ~7600 rows in biketrips_bg that are null, seems a couple of stationsd didn't merge
 # we believe these stations represent stations outside of metro DC (eg. in VA or MD) 
@@ -207,3 +205,12 @@ df.final <- merge(df.merge.1, df.acs, by=c("GEOID"), all.x = TRUE)
 # change all nas in the file to 0
 df.final[is.na(df.final)] <- 0
 
+find.quants <- subset(df.final, total_bl > 0 & total_bl < 2*(mean(df.final$total_bl) + sd(df.final$total_bl)))
+
+q <- as.data.frame(quantile(find.quants$total_bl))
+
+df.final$thresh1 <- 1*(df.final$total_bl > q[1,])
+df.final$thresh2 <- 1*(df.final$total_bl > q[2,])
+df.final$thresh3 <- 1*(df.final$total_bl > q[3,])
+df.final$thresh4 <- 1*(df.final$total_bl > q[4,])
+df.final$thresh5 <- 1*(df.final$total_bl > q[5,])
