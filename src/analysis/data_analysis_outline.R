@@ -239,19 +239,19 @@ for (model in list(lm)) {
   
   var_list = c("n_bl_tot")
   
-  filename_pr_train = paste("src/analysis/plots/", model,"_train_pr.png", sep = "")
+  filename_pr_train = paste("src/analysis/images/", model,"_train_pr.png", sep = "")
   plot_resids(resids_train, ytrain, yhat_train, Xtrain, var_list)
   ggsave(filename_pr_train, device = png)
   
-  filename_pr_test = paste("src/analysis/plots/", model,"_test_pr.png", sep = "")
+  filename_pr_test = paste("src/analysis/images/", model,"_test_pr.png", sep = "")
   plot_resids(resids_test, ytest, yhat_test, Xtest, var_list)
   ggsave(filename_pr_test, device = png)
   
-  filename_pi_train = paste("src/analysis/plots/", model,"_train_pi.png", sep = "")
+  filename_pi_train = paste("src/analysis/images/", model,"_train_pi.png", sep = "")
   plot_pi(q_train, ytrain, yhat_train, Xtrain, var_list)
   ggsave(filename_pi_train, device = png)
   
-  filename_pi_test = paste("src/analysis/plots/", model,"_test_pi.png", sep = "")
+  filename_pi_test = paste("src/analysis/images/", model,"_test_pi.png", sep = "")
   plot_pi(q_val, ytest, yhat_test, Xtest, var_list)
   ggsave(filename_pi_test, device = png)
   
