@@ -28,9 +28,16 @@ library(rjson)
 library(zoo)
 ################################################################################################################################################
 
+
 #--------------------------------- --------------------------------- --------------------------------- #
 #-----------------------------------------------Get data-----------------------------------------------#
 #--------------------------------- --------------------------------- --------------------------------- #
+
+# Working directory 
+
+#setwd("/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/src/exploration/") #Cris' directory
+setwd("/Users/alenastern/Documents/Win2019/MultiTesting/dc_bikeshare_stats")
+
 
 # ---- 1. Download block group geographies ---- #
 file_bg = paste0('https://opendata.arcgis.com/datasets/c143846b7bf4438c954c5bb28e5d1a21_2.geojson')
@@ -108,6 +115,10 @@ bl_bg <- rename(bl_bg, l_name = LICENSECATEGORY, l_cat = LICENSE_CATEGORY_TEXT )
 
 # set geometry to NULL so spread collapses month/year correctly
 st_geometry(bl_bg) <- NULL
+
+
+#bl_bg_test <- bl_bg %>% group_by(GEOID, start_month, start_year) %>% summarise(n_bl_tot = n())
+
 
 # see codes here: https://dcra.dc.gov/node/514522
 bl_bg_name <- bl_bg %>% group_by(GEOID, start_month, start_year,l_name) %>% summarise(nbl_name = n())
