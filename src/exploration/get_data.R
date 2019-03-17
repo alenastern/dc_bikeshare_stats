@@ -109,6 +109,8 @@ bl_bg <- rename(bl_bg, l_name = LICENSECATEGORY, l_cat = LICENSE_CATEGORY_TEXT )
 # set geometry to NULL so spread collapses month/year correctly
 st_geometry(bl_bg) <- NULL
 
+bl_bg_test <- bl_bg %>% group_by(GEOID, start_month, start_year) %>% summarise(n_bl_tot = n())
+
 # see codes here: https://dcra.dc.gov/node/514522
 bl_bg_name <- bl_bg %>% group_by(GEOID, start_month, start_year,l_name) %>% summarise(nbl_name = n())
 bl_bg_cat <- bl_bg %>% group_by(GEOID, start_month, start_year, l_cat) %>% summarise(nbl_cat = n())
