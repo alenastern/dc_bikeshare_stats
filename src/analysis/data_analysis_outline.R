@@ -1,10 +1,37 @@
+library(lubridate)
+library(reshape)
+library(tidyverse)
+library(readxl)
+library(scales)
+library(devtools)
+library(here)
+library(dplyr)
+library(treemapify)
+library(grid)
+library(gridExtra)
+library(ggplot2)
+library(ggmap)
+library(zipcode)
+library(geojsonR)
+library(geojsonsf)
+library(sf)
+library(rjson)
+library(zoo)
 
 # Set Working Directory
 
-setwd("~/Desktop/UChi/Classes/Stats/MultipleTesting_ModernInference/project_bikeshare/dc_bikeshare_stats/src/exploration/") #Cris' directory
+setwd("/Users/alenastern/Documents/Win2019/MultiTesting/dc_bikeshare_stats/")
+#source(here("src/exploration","get_data.R"))
+#source(here("src/exploration","data_timelags.R"))
+source("src/exploration/get_data.R")
+source("src/exploration/data_timelags.R")
 
-source(here("src/exploration","get_data.R"))
-source(here("src/exploration","data_timelags.R"))
+### Step 0: Prep Final Data for Analysis
+
+#df.final.timelag <- df.final.timelag %>% mutate_all(funs(replace(., is.na(.), 0)))
+
+total_data_panel <- total_data_panel %>% mutate_all(funs(replace(., is.na(.), 0)))
+
 
 ### Step 1: Split Data into Training, Validation, Testing Sets ###
 
@@ -14,7 +41,7 @@ train_test_split <- function(data, y_var, bg){
   # bg = boolean, whether randomizing on block group
  
   # Case when not randomizing on block group 
-  if(bg == TRUE) {
+  if(bg != TRUE) {
     X <- data %>% select(-y_var)
     y <- data[[y_var]]
     
@@ -44,29 +71,32 @@ train_test_split <- function(data, y_var, bg){
     val_set = data[data$GEOID %in% val_geo,]
     test_set = data[!data$GEOID %in% train_val_geo, ]
     
+  # Testing Code  
   # reduce(union, list(unique(as.vector(train_set$GEOID)), unique(as.vector(val_set$GEOID)), unique(as.vector(test_set$GEOID))))
   # reduce(intersect, list(unique(as.vector(train_set$GEOID)), unique(as.vector(val_set$GEOID)), unique(as.vector(test_set$GEOID))))
   # identify no GEOIDs in common and 85 in union
 
-    Xtrain <- train_set[ , ! colnames(train_set) %in% c(y_var) ]
-    #Xtrain <- train_set %>% select(-y_var)
-    ytrain <- train_set[[y_var]]
-    Xval <- val_set[ , ! colnames(val_set) %in% c(y_var) ]
-    yval <- train_set[[y_var]]
-    Xtest <- test_set[ , ! colnames(test_set) %in% c(y_var) ]
-    ytest <- train_set[[y_var]]
+    Xtrain <- data.matrix(train_set[ , ! colnames(train_set) %in% c(y_var) ])
+    ytrain <- data.matrix(train_set[[y_var]])
+    Xval <- data.matrix(val_set[ , ! colnames(val_set) %in% c(y_var) ])
+    yval <- data.matrix(val_set[[y_var]])
+    Xtest <- data.matrix(test_set[ , ! colnames(test_set) %in% c(y_var) ])
+    ytest <- data.matrix(test_set[[y_var]])
   }
   df_list = list(Xtrain, ytrain, Xval, yval, Xtest, ytest)
   return(df_list) 
 }
-#Q: do we have enough data to do this?
 
-### Step 2: Define All Variables to Use in Model and Appropriate Model ###
 
-#Q: I think there are standard statistical tests that help you pick the right model (eg Poison, linear, etc.)
-# Use training data to identify good model 
+df_list <- train_test_split(df.final.timelag, "n_rides_tot", TRUE)
+Xtrain <- df_list[[1]]
+ytrain <- df_list[[2]]
+Xval <- df_list[[3]]
+yval <- df_list[[4]]
+Xtest <- df_list[[5]]
+ytest <- df_list[[6]]
 
-### Step 3: Use Linear regression, Lasso Regression, Ridge Regression, Elastic Net, and Forward Selection to Identify Subset of Variables ###
+### Step 2: Use Linear regression, Lasso Regression, Ridge Regression, Elastic Net, and Forward Selection to Identify Subset of Variables ###
 
 #Q: we'd have to rewrite code for forward selection
 
@@ -88,6 +118,11 @@ ridge = list(name = "coef_ridge", b0 = coef_ridge[1], b = coef_ridge[-1])
 
 ### Step 3c: Elastic Net
 
+lamb_ = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, type.measure = "deviance", alpha = 0.5, n = 10)$lambda.min
+trained_elastic_net = glmnet(x = Xtrain, y = ytrain,  alpha = 0, lambda = lamb_) 
+coef_elastic_net = coef(trained_elastic_net)
+elastic_net = list(name = "coef_elastic_net", b0 = coef_elastic_net[1], b = coef_elastic_net[-1])
+
 ### Step 3d: Forward Selection
 
 ### Step 3e: Poisson
@@ -107,9 +142,59 @@ poisson = list(name = "coef_poiss", b0 = coef_poisson[1], b = coef_poisson[-1])
 
 ### Step 4d: Assess coverage of prediction interval on test set
 
+### Step 4e: Plot Residuals for Each Model
+
+# inspired by: https://drsimonj.svbtle.com/visualising-residuals
+
+plot_resids <- function(residuals, y, predicted, Xdf, var_list) {
+  
+  d <- cbind(y, predicted, residuals, Xdf)
+  d <- data.frame(d)
+  d <- d %>% rename(y = V1, predicted = V2, residuals = V3)
+  var_list <- append(var_list, c("y", "predicted", "residuals"))
+  d <- d[var_list]
+  
+  d %>% 
+    gather(key = "iv", value = "x", -y, -predicted, -residuals) %>%  # Get data into shape
+    ggplot(aes(x = x, y = y)) +  # Note use of `x` here and next line
+    geom_segment(aes(xend = x, yend = predicted), alpha = .2) +
+    geom_point(aes(color = residuals)) +
+    scale_color_gradient2(low = "blue", mid = "white", high = "red") +
+    guides(color = FALSE) +
+    geom_point(aes(y = predicted), shape = 1) +
+    facet_grid(~ iv, scales = "free_x") +  # Split panels here by `iv`
+    theme_bw()
+  
+}
+
+### Step 4f: Plot Prediction Intervals + Coverage
+
+plot_pi <- function(q90, y, predicted, Xdf, var_list) {
+  
+  d <- cbind(y, predicted, Xdf)
+  d <- data.frame(d)
+  d <- d %>% rename(y = V1, predicted = V2)
+  d <- d %>% mutate(upper = predicted + q90, lower = predicted - q90, covered = ifelse(y >= lower & y <= upper, 1, 0))
+  d$covered <- factor(d$covered, levels = c(0, 1))
+  
+  var_list <- append(var_list, c("y", "predicted", "upper", "lower", "covered"))
+  d <- d[var_list]
+  
+  d %>% 
+    gather(key = "iv", value = "x", -y, -predicted, -upper, -lower, -covered) %>%  # Get data into shape
+    ggplot(aes(x = x, y = y)) +  # Note use of `x` here and next line
+    geom_segment(aes(xend = x, y = lower, yend = upper), alpha = .2) +
+    geom_point(shape = 21, size = 2, aes(fill = covered)) +
+    scale_fill_manual(values = c("#cc0000","#339933")) +
+    facet_grid(~ iv, scales = "free_x") +  # Split panels here by `iv`
+    theme_bw()
+  
+}
+
 model_performance = data.frame()
 index = 0
-for (model in list(lm, lasso, ridge, poisson)){
+#for (model in list(lm, lasso, ridge, elastic_net, poisson)){
+for (model in list(lm)) {
   index = index + 1
   model_performance[index, "model"] = model$name
   model_performance[index, "type"] = "non-truncated"
@@ -131,6 +216,7 @@ for (model in list(lm, lasso, ridge, poisson)){
   
   # predictions on test set
   yhat_test = model$b0 + Xtest%*%model$b
+  resids_test = ytest - yhat_test
   
   # prediction error on the training set:
   RMSE_train = sqrt(mean((ytrain - yhat_train)^2))
@@ -150,6 +236,24 @@ for (model in list(lm, lasso, ridge, poisson)){
   # coverage on training & test set, using q_val
   model_performance[index, "cov_train_qval"] = mean(yhat_train - q_val <= ytrain & ytrain <= yhat_train + q_val)
   model_performance[index, "cov_test_qval"] = 	mean(yhat_test - q_val <= ytest & ytest <= yhat_test + q_val)
+  
+  var_list = c("n_bl_tot")
+  
+  filename_pr_train = paste("src/analysis/plots/", model,"_train_pr.png", sep = "")
+  plot_resids(resids_train, ytrain, yhat_train, Xtrain, var_list)
+  ggsave(filename_pr_train, device = png)
+  
+  filename_pr_test = paste("src/analysis/plots/", model,"_test_pr.png", sep = "")
+  plot_resids(resids_test, ytest, yhat_test, Xtest, var_list)
+  ggsave(filename_pr_test, device = png)
+  
+  filename_pi_train = paste("src/analysis/plots/", model,"_train_pi.png", sep = "")
+  plot_pi(q_train, ytrain, yhat_train, Xtrain, var_list)
+  ggsave(filename_pi_train, device = png)
+  
+  filename_pi_test = paste("src/analysis/plots/", model,"_test_pi.png", sep = "")
+  plot_pi(q_val, ytest, yhat_test, Xtest, var_list)
+  ggsave(filename_pi_test, device = png)
   
 } 
 
