@@ -36,6 +36,7 @@ df.final.timelag  <- df.final.timelag %>% mutate(date_11bef = date_m %m-% months
 df.final.timelag  <- df.final.timelag %>% mutate(date_12bef = date_m %m-% months(12))
 df.final.timelag  <- df.final.timelag %>% filter(!is.na(GEOID))
 
+ 
 # 1 month lag: merge  
 df.final.timelag_1 <- left_join(df.final.timelag, df.final.timelag, by = c("GEOID" = "GEOID", "date_1bef" = "date_m"), suffix = c("", ".1bef"))
     new_cols = vector()
@@ -236,5 +237,46 @@ df.final.timelags <- df.final.timelags %>% mutate(totcum_rides_12m = n_rides_tot
                                                       n_rides_tot.9bef +  n_rides_tot.10bef + 
                                                       n_rides_tot.11bef +  n_rides_tot.12bef,  na.rm = TRUE)
 
+# Adding a variable to control for seasonality
+df.final.timelags <- df.final.timelags %>% mutate(start_month = ifelse(start_month == 0, yes = month(date), no = start_month)) 
+df.final.timelags <- df.final.timelags %>% mutate(start_year = ifelse(start_year == 0, yes = year(date), no = start_year)) 
+df.final.timelags <- df.final.timelags %>% mutate(season = paste(ifelse(test = ((start_month == 12 ) | (start_month == 1 ) | (start_month == 2 )), 
+                                                                      yes = 'winter', no = 
+                                                                        (ifelse(test = ((start_month == 3 ) | (start_month == 4 ) | (start_month == 5 )), 
+                                                                                yes = 'spring', no = 
+                                                                                  (ifelse(test = ((start_month == 6 ) | (start_month == 7 ) | (start_month == 8 )),
+                                                                                          yes = 'summer', no = 'autum'))))), start_year)) 
+
+# Dummifying seasons 
+mm <- model.matrix(~season, df.final.timelags)
+df.final.timelags <- cbind(df.final.timelags, mm)
+
+df.final.timelags <- df.final.timelags %>% select(-contains('start_month'))
+df.final.timelags <- df.final.timelags %>% select(-contains('start_year'))
+df.final.timelags <- df.final.timelags %>% select(-contains("date"))
+df.final.timelags <- df.final.timelags %>% select(-("season"))
+df.final.timelags <- df.final.timelags %>% select(-("na.rm"))
+df.final.timelags <- df.final.timelags %>% mutate_all(funs(replace(., is.na(.), 0)))
+df.final.timelags <- df.final.timelags %>% select(-contains("GEOID"))
+
+cols = colnames(df.final.timelags);    
+df.final.timelags[,cols] = apply(df.final.timelags[,cols], 2, function(x) as.numeric(as.character(x)));
+df.final.timelags <- df.final.timelags %>% mutate_all(funs(replace(., is.na(.), 0)))
+
+df.final.timelags <- df.final.timelags[, colSums(df.final.timelags != 0) > 0]
+
+rm(df.final.timelag)
+rm(df.final.timelag_1)
+rm(df.final.timelag_2)
+rm(df.final.timelag_3)
+rm(df.final.timelag_4)
+rm(df.final.timelag_5)
+rm(df.final.timelag_6)
+rm(df.final.timelag_7)
+rm(df.final.timelag_8)
+rm(df.final.timelag_9)
+rm(df.final.timelag_10)
+rm(df.final.timelag_11)
+rm(df.final.timelag_12)
 
 write.csv(df.final.timelags, file = "df_final_timelags.csv")
