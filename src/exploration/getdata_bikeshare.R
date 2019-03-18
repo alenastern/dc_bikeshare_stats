@@ -1,5 +1,10 @@
 library(stringr)
-data = NULL
+library(lubridate)
+library(tidyverse)
+library(dplyr)
+
+setwd('/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/src/exploration/')
+data.grouped = NULL
 
 for(i in 2010:2015){ #2010:2011 the data goes up to 2017, but the files are extremely large from 2011 onwards - you can decide to just use a subset
   print(i)
@@ -7,71 +12,40 @@ for(i in 2010:2015){ #2010:2011 the data goes up to 2017, but the files are extr
 	download.file(file,destfile='bikedata.zip')
 	list_of_txts <- unzip('bikedata.zip', list=TRUE)[,1]
 	list_of_txts<-list_of_txts[str_detect(list_of_txts,".csv")]
-	#print(list_of_txts)
+	
 	for (l in list_of_txts){
 	  print(l)
 	  unzip('bikedata.zip')
-	  data = rbind(data,read.csv(paste0(l)))
+	  data = read.csv(l)
+	  n = dim(data)[1]
+	  
+	  starttime = as.numeric(strsplit(toString(data[,2]),split='[-:, ]')[[1]][-7*(1:n)]) # start time of ride #i
+	  dim(starttime) = c(6,n); starttime = t(starttime) # row i = year/month/date/hour/minute/second for ride #i
+	  duration = data[,1] # duration of the ride in seconds
+	  station_start = data[,4] # station ID where the bike was checked out
+	  station_end = data[,6] # station ID where the bike was returned
+	  bikenum =  as.numeric((strsplit(toString(data[,8]),'[?wW, ]')[[1]][3*(1:n)-1])) # some are NA, the data is messy for this one
+	  member = (data[,9]=='Member') # member (1) or nonmember (0)
+	  
+	  data$date = as.Date(data$Start.date, "%Y-%m-%d %H:%M:%S")
+	  data$start_day = day(data$date)
+	  data$start_month = month(data$date)
+	  data$start_year = year(data$date)
+	  data$month_yr <- format(as.Date(data$date),"%Y-%m")
+	  data_collapsed <- data %>% group_by(End.station.number, start_month, start_year, month_yr) %>% summarise(n_rides = n(), avg_duration = mean(Duration))
+	  
+	  data.grouped <- rbind(data.grouped, data_collapsed)
+	  
+	  stations = NULL # stations[i,1] = station ID for the i-th station, stations[i,2] = station location for the i-th station
+	  for(i in unique(c(station_start,station_end))){
+	    if(any(data[,4]==i)){
+	      ind = min(which(data[,4]==i))
+	      location = toString(data[ind,5])
+	    }else{
+	      ind = min(which(data[,6]==i))
+	      location = toString(data[ind,7])
+	    }
+	    stations = rbind(stations,c(i,location))
+	  }
 	}
 }
-
-write.csv(data,'/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/src/exploration/data.csv')
-
-data.safe <- data
-data.safe.2 <- data
-
-chunk.amount <- 50000
-start.index <- 1
-end.index <- chunk.amount
-data.new <- NULL
-
-while (end.index < dim(data)[1]){
-  s <- data[start.index:end.index,,drop=F]
-  n = dim(s)[1]
-
-  starttime = as.numeric(strsplit(toString(s[,2]),split='[-:, ]')[[1]][-7*(1:n)]) # start time of ride #i
-  dim(starttime) = c(6,n); starttime = t(starttime) # row i = year/month/date/hour/minute/second for ride #i
-  duration = s[,1] # duration of the ride in seconds
-  station_start = s[,4] # station ID where the bike was checked out
-  station_end = s[,6] # station ID where the bike was returned
-  bikenum =  as.numeric((strsplit(toString(s[,8]),'[?wW, ]')[[1]][3*(1:n)-1])) # some are NA, the data is messy for this one
-  member = (s[,9]=='Member') # member (1) or nonmember (0)
-  data.new = rbind(data.new,s)
-  start.index <- start.index + chunk.amount
-  end.index <- end.index + chunk.amount
-  if (dim(data)[1] < end.index){
-    end.index <- dim(data)[1]
-    print("if")
-    print(start.index)
-  }
-  else{
-    print(start.index)
-  }
-}
-
-#write.csv(data.new,'/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/src/exploration/data_new.csv')
-
-# starttime = as.numeric(strsplit(toString(data[,2]),split='[-:, ]')[[1]][-7*(1:n)]) # start time of ride #i
-# dim(starttime) = c(6,n); starttime = t(starttime) # row i = year/month/date/hour/minute/second for ride #i
-# duration = data[,1] # duration of the ride in seconds
-# station_start = data[,4] # station ID where the bike was checked out
-# station_end = data[,6] # station ID where the bike was returned
-# bikenum =  as.numeric((strsplit(toString(data[,8]),'[?wW, ]')[[1]][3*(1:n)-1])) # some are NA, the data is messy for this one
-# member = (data[,9]=='Member') # member (1) or nonmember (0)
-
-stations = NULL # stations[i,1] = station ID for the i-th station, stations[i,2] = station location for the i-th station
-for(i in unique(c(station_start,station_end))){
-	if(any(data[,4]==i)){
-		ind = min(which(data[,4]==i))
-		location = toString(data[ind,5])
-	}else{
-		ind = min(which(data[,6]==i))
-		location = toString(data[ind,7])
-	}
-	stations = rbind(stations,c(i,location))
-}
-# note that stations get added to the program over time
-
-
-
-
