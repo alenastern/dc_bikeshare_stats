@@ -3,8 +3,7 @@
 #       - change working path of variables file on ACS data file, called by this file. 
 
 # Working directories: 
-  #setwd("/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/src/exploration/") #Alix's directory
-setwd("/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/") #Cris' directory
+setwd("/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/") #Alix's directory
 
 # Install the following libraries: 
 library(lubridate)
@@ -32,12 +31,6 @@ library(zoo)
 #--------------------------------- --------------------------------- --------------------------------- #
 #-----------------------------------------------Get data-----------------------------------------------#
 #--------------------------------- --------------------------------- --------------------------------- #
-
-# Working directory 
-
-#setwd("/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/src/exploration/") #Cris' directory
-setwd("/Users/alenastern/Documents/Win2019/MultiTesting/dc_bikeshare_stats")
-
 
 # ---- 1. Download block group geographies ---- #
 file_bg = paste0('https://opendata.arcgis.com/datasets/c143846b7bf4438c954c5bb28e5d1a21_2.geojson')
@@ -90,12 +83,12 @@ source("src/exploration/getdata_bikeshare.R")
 #source(here("getdata_bikeshare.R")) 
 
 # 4.2 Collapse at the month - year level
-data$date = as.Date(data$Start.date, "%Y-%m-%d %H:%M:%S")
-data$start_day = day(data$date)
-data$start_month = month(data$date)
-data$start_year = year(data$date)
-data$month_yr <- format(as.Date(data$date),"%Y-%m")
-data_collapsed <- data %>% group_by(Start.station.number, End.station.number, start_month, start_year, month_yr) %>% summarise(n_rides = n(), avg_duration = mean(Duration))
+# data$date = as.Date(data$Start.date, "%Y-%m-%d %H:%M:%S")
+# data$start_day = day(data$date)
+# data$start_month = month(data$date)
+# data$start_year = year(data$date)
+# data$month_yr <- format(as.Date(data$date),"%Y-%m")
+# data_collapsed <- data %>% group_by(Start.station.number, End.station.number, start_month, start_year, month_yr) %>% summarise(n_rides = n(), avg_duration = mean(Duration))
 
 # 4.3 Used stations
 stations_fr <- data.frame(stations) 
@@ -136,7 +129,7 @@ bl_bg_all <- bl_bg_all %>% mutate(total_bl = select(., l_cat_Employment_Services
 # 4.2 Stations with bike trips:
 stations_latlon$station_id = as.numeric(stations_latlon$station_id)
 # For now, only joining on the "end-station"
-biketrips_collapsed <- left_join(data_collapsed, stations_latlon, by = c("End.station.number" = "station_id"), suffix = c(".start", ".end"))
+biketrips_collapsed <- left_join(data.grouped, stations_latlon, by = c("End.station.number" = "station_id"), suffix = c(".start", ".end"))
 biketrips_collapsed <- st_as_sf(biketrips_collapsed)
 
 # 4.3 Bike trips with block group levels. 
@@ -207,7 +200,7 @@ dummies <- expand.grid(date = df.date.dummies, GEOID = df.geoid.dummies)
 
 # pull the ACS data
 # Need to change working directory from within ACS data to be able to pull ACS data
-source("src/exploration/ACS data.R")
+source("ACS data.R")
 
 # merge total data panel and acs data, keeping all geoids. 
 df.merge.1 <- merge(dummies, total_data_panel, by=c("GEOID", "date"), all.x = TRUE)
@@ -225,3 +218,6 @@ df.final$thresh2 <- 1*(df.final$total_bl > q[2,])
 df.final$thresh3 <- 1*(df.final$total_bl > q[3,])
 df.final$thresh4 <- 1*(df.final$total_bl > q[4,])
 df.final$thresh5 <- 1*(df.final$total_bl > q[5,])
+
+#write.csv(df.final, "df_final.csv")
+
