@@ -17,10 +17,14 @@ library(geojsonsf)
 library(sf)
 library(rjson)
 library(zoo)
+library(glmnet)
 
 # Set Working Directory
 
-setwd("/Users/alenastern/Documents/Win2019/MultiTesting/dc_bikeshare_stats/")
+#setwd("/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/src/exploration/") #Alix's directory
+#setwd("/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/") #Cris' directory
+#setwd("/Users/alenastern/Documents/Win2019/MultiTesting/dc_bikeshare_stats/")
+
 #source(here("src/exploration","get_data.R"))
 #source(here("src/exploration","data_timelags.R"))
 source("src/exploration/get_data.R")
@@ -28,10 +32,9 @@ source("src/exploration/data_timelags.R")
 
 ### Step 0: Prep Final Data for Analysis
 
-#df.final.timelag <- df.final.timelag %>% mutate_all(funs(replace(., is.na(.), 0)))
+df.final.timelags <- df.final.timelags %>% mutate_all(funs(replace(., is.na(.), 0)))
 
-total_data_panel <- total_data_panel %>% mutate_all(funs(replace(., is.na(.), 0)))
-
+#total_data_panel <- total_data_panel %>% mutate_all(funs(replace(., is.na(.), 0)))
 
 ### Step 1: Split Data into Training, Validation, Testing Sets ###
 
@@ -215,21 +218,20 @@ plot_pi <- function(q90, y, predicted, Xdf, var_list) {
 
 model_performance = data.frame()
 index = 0
-#for (model in list(lm, lasso, ridge, elastic_net, poisson)){
-for (model in list(lm)) {
+for (model in list(lm, lasso, ridge, elastic_net, poisson)){
+#for (model in list(lm)) {
   index = index + 1
   model_performance[index, "model"] = model$name
-  model_performance[index, "type"] = "non-truncated"
-  
+
   # PI width using training set
   yhat_train = model$b0 + Xtrain%*%model$b 
   resids_train = ytrain - yhat_train # Residuals
-  q_train = quantile(abs(resids_train),0.9)
+  q_train = quantile(abs(resids_train),0.9, na.rm = TRUE)
   
   # PI width using validation set
   yhat_val = model$b0 + Xval%*%model$b
   resids_val = yval - yhat_val # Residuals
-  q_val = quantile(abs(resids_val),0.9)
+  q_val = quantile(abs(resids_val),0.9, na.rm = TRUE)
   
   model_performance[index, "q90_train"] = q_train
   model_performance[index, "q90_val"] = q_val
@@ -259,7 +261,7 @@ for (model in list(lm)) {
   model_performance[index, "cov_train_qval"] = mean(yhat_train - q_val <= ytrain & ytrain <= yhat_train + q_val)
   model_performance[index, "cov_test_qval"] = 	mean(yhat_test - q_val <= ytest & ytest <= yhat_test + q_val)
   
-  var_list = c("n_bl_tot")
+  var_list = c("total_bl")
   
   filename_pr_train = paste("src/analysis/images/", model$name,"_train_pr.png", sep = "")
   plot_resids(resids_train, ytrain, yhat_train, Xtrain, var_list)
