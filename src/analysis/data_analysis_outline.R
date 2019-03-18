@@ -96,41 +96,64 @@ yval <- df_list[[4]]
 Xtest <- df_list[[5]]
 ytest <- df_list[[6]]
 
-### Step 2: Use Linear regression, Lasso Regression, Ridge Regression, Elastic Net, and Forward Selection to Identify Subset of Variables ###
+### Step 2: Set penalty ###
 
-#Q: we'd have to rewrite code for forward selection
+### find column indices for variables we do not want to apply shrinkage (eg. definitely include these variables in final model)
+
+no_shrinkage_list = c("total_bl", "season_year", "race")
+
+# identify indices of 'no-shrinkage' variables
+var_indices <- c()
+for (var in no_shrinkage_list) {
+  idx <- grep("B", colnames(Xtrain))
+  var_indices <- append(var_indices, c(idx))
+}
+
+# initializes vector of 1s
+penalty_factor <- rep(1, length(colnames(Xtrain)))
+
+# replaces indices corresponding to 'no-shrinkage' variables with 0
+penalty_factor <- replace(penalty_factor, var_indices, 0)
+
+
 
 ### Step 3a:LR
 coef_lm = lm(ytrain~Xtrain)$coef 
 lm = list(name = "coef_lm", b0 = coef_lm[1], b = coef_lm[-1])
 
 ### Step 3a:Lasso
-lamb_ = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, type.measure = "deviance", alpha = 1, n = 10)$lambda.min
+cv_lasso = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, type.measure = "deviance", alpha = 1, n = 10)
+lamb_ = cv_lasso$lambda.min
 trained_lasso = glmnet(x = Xtrain, y = ytrain,  alpha = 1, lambda = lamb_) 
 coef_lasso = coef(trained_lasso)
 lasso = list(name = "coef_lasso", b0 = coef_lasso[1], b = coef_lasso[-1])
+reg_path_lasso = cv_lasso$beta
 
 ### Step 3b: Ridge
-lamb_ = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, type.measure = "deviance", alpha = 0, n = 10)$lambda.min
+cv_ridge = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, type.measure = "deviance", alpha = 0, n = 10)
+lamb_ = cv_ridge$lambda.min
 trained_ridge = glmnet(x = Xtrain, y = ytrain,  alpha = 0, lambda = lamb_) 
 coef_ridge = coef(trained_ridge)
 ridge = list(name = "coef_ridge", b0 = coef_ridge[1], b = coef_ridge[-1])
+reg_path_ridge = cv_ridge$beta
 
 ### Step 3c: Elastic Net
-
-lamb_ = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, type.measure = "deviance", alpha = 0.5, n = 10)$lambda.min
+cv_elastic_net = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, type.measure = "deviance", alpha = 0.5, n = 10)
+lamb_ = cv_elastic_net$lambda.min
 trained_elastic_net = glmnet(x = Xtrain, y = ytrain,  alpha = 0, lambda = lamb_) 
 coef_elastic_net = coef(trained_elastic_net)
 elastic_net = list(name = "coef_elastic_net", b0 = coef_elastic_net[1], b = coef_elastic_net[-1])
+reg_path_elastic_net = cv_elastic_net$beta
 
 ### Step 3d: Forward Selection
 
 ### Step 3e: Poisson
-
-lamb_ = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, family = "poisson", n = 10)$lambda.min
+cv_poisson = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, family = "poisson", n = 10)
+lamb_ = cv_poisson$lambda.min
 trained_poison = glmnet(Xtrain, ytrain, family = "poisson", lambda = lamb_)
 coef_poisson = coef(trained_poison)
 poisson = list(name = "coef_poiss", b0 = coef_poisson[1], b = coef_poisson[-1])
+reg_path_poisson = cv_poisson$beta
 
 ### Step 4: Assess Model on Test Set ###
 
@@ -154,8 +177,7 @@ plot_resids <- function(residuals, y, predicted, Xdf, var_list) {
   var_list <- append(var_list, c("y", "predicted", "residuals"))
   d <- d[var_list]
   
-  d %>% 
-    gather(key = "iv", value = "x", -y, -predicted, -residuals) %>%  # Get data into shape
+  d %>% gather(key = "iv", value = "x", -y, -predicted, -residuals) %>%  # Get data into shape
     ggplot(aes(x = x, y = y)) +  # Note use of `x` here and next line
     geom_segment(aes(xend = x, yend = predicted), alpha = .2) +
     geom_point(aes(color = residuals)) +
@@ -239,21 +261,21 @@ for (model in list(lm)) {
   
   var_list = c("n_bl_tot")
   
-  filename_pr_train = paste("src/analysis/images/", model,"_train_pr.png", sep = "")
+  filename_pr_train = paste("src/analysis/images/", model$name,"_train_pr.png", sep = "")
   plot_resids(resids_train, ytrain, yhat_train, Xtrain, var_list)
-  ggsave(filename_pr_train, device = png)
+  ggsave(filename_pr_train, width = 30, height = 20, units = "cm")
   
-  filename_pr_test = paste("src/analysis/images/", model,"_test_pr.png", sep = "")
+  filename_pr_test = paste("src/analysis/images/", model$name,"_test_pr.png", sep = "")
   plot_resids(resids_test, ytest, yhat_test, Xtest, var_list)
-  ggsave(filename_pr_test, device = png)
+  ggsave(filename_pr_test, width = 30, height = 20, units = "cm")
   
-  filename_pi_train = paste("src/analysis/images/", model,"_train_pi.png", sep = "")
+  filename_pi_train = paste("src/analysis/images/", model$name,"_train_pi.png", sep = "")
   plot_pi(q_train, ytrain, yhat_train, Xtrain, var_list)
-  ggsave(filename_pi_train, device = png)
+  ggsave(filename_pi_train, width = 30, height = 20, units = "cm")
   
-  filename_pi_test = paste("src/analysis/images/", model,"_test_pi.png", sep = "")
+  filename_pi_test = paste("src/analysis/images/", model$name,"_test_pi.png", sep = "")
   plot_pi(q_val, ytest, yhat_test, Xtest, var_list)
-  ggsave(filename_pi_test, device = png)
+  ggsave(filename_pi_test, width = 30, height = 20, units = "cm")
   
 } 
 
