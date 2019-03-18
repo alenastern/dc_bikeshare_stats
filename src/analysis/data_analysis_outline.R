@@ -88,7 +88,7 @@ train_test_split <- function(data, y_var, bg){
 }
 
 
-df_list <- train_test_split(df.final.timelag, "n_rides_tot", TRUE)
+df_list <- train_test_split(df.final.timelags, "n_rides_tot", TRUE)
 Xtrain <- df_list[[1]]
 ytrain <- df_list[[2]]
 Xval <- df_list[[3]]
@@ -103,22 +103,43 @@ ytest <- df_list[[6]]
 no_shrinkage_list = c("total_bl", "season_year", "race")
 
 # identify indices of 'no-shrinkage' variables
-var_indices <- c()
+ns_var_indices <- c()
 for (var in no_shrinkage_list) {
-  idx <- grep("B", colnames(Xtrain))
-  var_indices <- append(var_indices, c(idx))
+  idx <- grep(var, colnames(Xtrain))
+  var_indices <- append(ns_var_indices, c(idx))
 }
 
 # initializes vector of 1s
 penalty_factor <- rep(1, length(colnames(Xtrain)))
 
 # replaces indices corresponding to 'no-shrinkage' variables with 0
-penalty_factor <- replace(penalty_factor, var_indices, 0)
+penalty_factor <- replace(penalty_factor, ns_var_indices, 0)
 
 ### Step 2b: define groups for grouped lasso
 
-#https://cran.r-project.org/web/packages/grplasso/grplasso.pdf
+groups_time = c("1bef", "2bef", "3bef", "4bef", "5bef", "6bef", "7bef", "8bef", 
+           "9bef", "10bef", "11bef", "12bef")
 
+groups_bl_type = c("l_cat", "l_name")
+
+
+make_index_list <- function(groups, ns_var_indices, Xtrain){
+  index = seq(1, length(colnames(Xtrain)), by = 1)
+  gp_index_num = length(colnames(Xtrain)) + 1
+  for(gp in groups){
+    gp_idx <- grep(gp, colnames(Xtrain))
+    replace(index, gp_idx, gp_index_num)
+    gp_index_num = gp_index_num + 1
+  }
+  
+  # don't penalize non-shrinkage vars or intercept
+  index = replace(index, ns_var_indices, NA)
+  index = append(c(NA), index)
+  return(index)
+}
+
+
+#https://cran.r-project.org/web/packages/grplasso/grplasso.pdf
 
 
 ### Step 3a:LR
@@ -158,6 +179,38 @@ trained_poison = glmnet(Xtrain, ytrain, family = "poisson", lambda = lamb_)
 coef_poisson = coef(trained_poison)
 poisson = list(name = "coef_poiss", b0 = coef_poisson[1], b = coef_poisson[-1])
 reg_path_poisson = cv_poisson$beta
+
+### Step 3f: Grouped Lasso Linear
+
+# Add intercept to X matrix
+gp_Xtrain = cbind(rep(1, nrow(Xtrain)), Xtrain)
+
+index = make_index_list(groups_bl_type, ns_var_indices, Xtrain)
+lambda_lin <- lambdamax(Xtrain_gp, y = train, index = index, penscale = sqrt,
+                    model = LinReg()) * 0.5^(0:5)
+
+trained_gp_lasso_lin <- grplasso(x = Xtrain_gp, y = ytrain, index = index, lambda = lambda_lin, model = LinReg(),
+                penscale = sqrt,
+                control = grpl.control(update.hess = "lambda", trace = 0))
+coef_gp_lasso_linear = coef(trained_gp_lasso_lin)
+gp_lasso_linear = list(name("coef_gp_lasso_linear", b0 = coef_gp_lasso_linear[1], b = coef_gp_lasso_linear[-1]))
+
+## Plot coefficient paths
+plot(fit)
+
+### Step 3g: Grouped Lasso Poisson
+lambda_poiss <- lambdamax(x = Xtrain, y = train, index = index, penscale = sqrt,
+                        model = PoissReg()) * 0.5^(0:5)
+
+trained_gp_lasso_poiss <- grplasso(x = Xtrain_gp, y = ytrain, index = index, lambda = lambda_poiss, model = PoissReg(),
+                             penscale = sqrt,
+                             control = grpl.control(update.hess = "lambda", trace = 0))
+coef_gp_lasso_poiss = coef(trained_gp_lasso_poiss)
+gp_lasso_poisson = list(name("coef_gp_lasso_poisson", b0 = coef_gp_lasso_poiss[1], b = coef_gp_lasso_poiss[-1]))
+
+## Plot coefficient paths
+plot(fit)
+
 
 ### Step 4: Assess Model on Test Set ###
 
@@ -219,7 +272,7 @@ plot_pi <- function(q90, y, predicted, Xdf, var_list) {
 
 model_performance = data.frame()
 index = 0
-#for (model in list(lm, lasso, ridge, elastic_net, poisson)){
+#for (model in list(lm, lasso, ridge, elastic_net, poisson, gp_lasso_linear, gp_lasso_poisson)){
 for (model in list(lm)) {
   index = index + 1
   model_performance[index, "model"] = model$name
