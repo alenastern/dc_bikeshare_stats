@@ -1,10 +1,18 @@
+library(stringr)
 data = NULL
 
-for(i in 2010:2011){ # the data goes up to 2017, but the files are extremely large from 2011 onwards - you can decide to just use a subset
-	file = paste0('https://s3.amazonaws.com/capitalbikeshare-data/',i,'-capitalbikeshare-tripdata.zip')
+for(i in 2010:2015){ #2010:2011 the data goes up to 2017, but the files are extremely large from 2011 onwards - you can decide to just use a subset
+  print(i)
+  file = paste0('https://s3.amazonaws.com/capitalbikeshare-data/',i,'-capitalbikeshare-tripdata.zip')
 	download.file(file,destfile='bikedata.zip')
-	unzip('bikedata.zip')
-	data = rbind(data,read.csv(paste0(i,'-capitalbikeshare-tripdata.csv')))
+	list_of_txts <- unzip('bikedata.zip', list=TRUE)[,1]
+	list_of_txts<-list_of_txts[str_detect(list_of_txts,".csv")]
+	#print(list_of_txts)
+	for (l in list_of_txts){
+	  print(l)
+	  unzip('bikedata.zip')
+	  data = rbind(data,read.csv(paste0(l)))
+	}
 }
 
 n = dim(data)[1]
