@@ -15,15 +15,49 @@ for(i in 2010:2015){ #2010:2011 the data goes up to 2017, but the files are extr
 	}
 }
 
-n = dim(data)[1]
+write.csv(data,'/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/src/exploration/data.csv')
 
-starttime = as.numeric(strsplit(toString(data[,2]),split='[-:, ]')[[1]][-7*(1:n)]) # start time of ride #i
-dim(starttime) = c(6,n); starttime = t(starttime) # row i = year/month/date/hour/minute/second for ride #i
-duration = data[,1] # duration of the ride in seconds
-station_start = data[,4] # station ID where the bike was checked out
-station_end = data[,6] # station ID where the bike was returned
-bikenum =  as.numeric((strsplit(toString(data[,8]),'[?wW, ]')[[1]][3*(1:n)-1])) # some are NA, the data is messy for this one
-member = (data[,9]=='Member') # member (1) or nonmember (0)
+data.safe <- data
+data.safe.2 <- data
+
+chunk.amount <- 50000
+start.index <- 1
+end.index <- chunk.amount
+data.new <- NULL
+
+while (end.index < dim(data)[1]){
+  s <- data[start.index:end.index,,drop=F]
+  n = dim(s)[1]
+
+  starttime = as.numeric(strsplit(toString(s[,2]),split='[-:, ]')[[1]][-7*(1:n)]) # start time of ride #i
+  dim(starttime) = c(6,n); starttime = t(starttime) # row i = year/month/date/hour/minute/second for ride #i
+  duration = s[,1] # duration of the ride in seconds
+  station_start = s[,4] # station ID where the bike was checked out
+  station_end = s[,6] # station ID where the bike was returned
+  bikenum =  as.numeric((strsplit(toString(s[,8]),'[?wW, ]')[[1]][3*(1:n)-1])) # some are NA, the data is messy for this one
+  member = (s[,9]=='Member') # member (1) or nonmember (0)
+  data.new = rbind(data.new,s)
+  start.index <- start.index + chunk.amount
+  end.index <- end.index + chunk.amount
+  if (dim(data)[1] < end.index){
+    end.index <- dim(data)[1]
+    print("if")
+    print(start.index)
+  }
+  else{
+    print(start.index)
+  }
+}
+
+#write.csv(data.new,'/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/src/exploration/data_new.csv')
+
+# starttime = as.numeric(strsplit(toString(data[,2]),split='[-:, ]')[[1]][-7*(1:n)]) # start time of ride #i
+# dim(starttime) = c(6,n); starttime = t(starttime) # row i = year/month/date/hour/minute/second for ride #i
+# duration = data[,1] # duration of the ride in seconds
+# station_start = data[,4] # station ID where the bike was checked out
+# station_end = data[,6] # station ID where the bike was returned
+# bikenum =  as.numeric((strsplit(toString(data[,8]),'[?wW, ]')[[1]][3*(1:n)-1])) # some are NA, the data is messy for this one
+# member = (data[,9]=='Member') # member (1) or nonmember (0)
 
 stations = NULL # stations[i,1] = station ID for the i-th station, stations[i,2] = station location for the i-th station
 for(i in unique(c(station_start,station_end))){
