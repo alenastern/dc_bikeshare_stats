@@ -20,7 +20,7 @@ library(zoo)
 setwd("~/Desktop/UChi/Classes/Stats/MultipleTesting_ModernInference/project_bikeshare/dc_bikeshare_stats/") #Cris' directory
 
 ### 
-df.final.timelag <- df.final
+df.final.timelag  <- df.final
 df.final.timelag  <- df.final.timelag %>% mutate(date_m = as.Date(date))
 df.final.timelag  <- df.final.timelag %>% mutate(date_1bef = date_m %m-% months(1))
 df.final.timelag  <- df.final.timelag %>% mutate(date_2bef = date_m %m-% months(2))
@@ -237,4 +237,4 @@ df.final.timelags <- df.final.timelags %>% mutate(totcum_rides_12m = n_rides_tot
                                                       n_rides_tot.11bef +  n_rides_tot.12bef,  na.rm = TRUE)
 
 
-#write.csv(df.final.timelags, file = "/src/exploration/df_final_timelags.csv")
+write.csv(df.final.timelags, file = "df_final_timelags.csv")
