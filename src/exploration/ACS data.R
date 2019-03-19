@@ -138,6 +138,21 @@ df.acs <- df.mutated[, -c(6:80)]
 
 df.acs$GEOID <- paste0(df.acs$state, df.acs$county, df.acs$tract, df.acs$block_group)
 
+rm(for_equal)
+rm(in_equal_county)
+rm(in_equal_state)
+rm(in_equal_tract)
+rm(key)
+rm(link)
+rm(topics)
+rm(vars.to.add)
+rm(keep)
+rm(indx)
+rm(df.mutated)
+rm(vars)
+rm(df)
+rm(df.new)
+
 
 
 
