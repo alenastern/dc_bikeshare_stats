@@ -1,4 +1,34 @@
 
+library(lubridate)
+library(reshape)
+library(tidyverse)
+library(readxl)
+library(scales)
+library(devtools)
+library(here)
+library(dplyr)
+library(treemapify)
+library(grid)
+library(gridExtra)
+library(ggplot2)
+library(ggmap)
+library(zipcode)
+library(geojsonR)
+library(geojsonsf)
+library(sf)
+library(rjson)
+library(zoo)
+library(glmnet)
+library(grpreg)
+
+# Set Working Directory
+
+#setwd("/Users/alenastern/Documents/Win2019/MultiTesting/dc_bikeshare_stats/")
+setwd('/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/')
+source("src/exploration/get_data.R")
+source("src/exploration/data_timelags.R")
+
+
 # Selective inference - referencing Rina Barber's Inference on linear regression code ("2/27/2019")
 # Step 0: Pre-processing for* 
 
@@ -15,15 +45,15 @@ turn_into_matrix <- function(data, y_var){
 
 
 #### Running Lasso with cross-validation  
-  df_list <- turn_into_matrix(df.final.timelags, "n_rides_tot")
-  X <- df_list[[1]]
-  Y <- df_list[[2]]
+df_list <- turn_into_matrix(df.no.dups, "n_rides_tot")
+X <- df_list[[1]]
+Y <- df_list[[2]]
 
-  lambda = cv.glmnet(x = X, y = Y, lambda = NULL, type.measure = "deviance", alpha = 1, n = 10)$lambda.min
-  si_lasso = glmnet(x = X, y = Y,  alpha = 1, lambda = lambda) 
-  coef_lasso = coef(si_lasso)
-  lasso = list(name = "coef_lasso", b0 = coef_lasso[1], b = coef_lasso[-1])
-  betahat = coef(si_lasso, s=lambda/n)[-1] 
+lambda = cv.glmnet(x = X, y = Y, lambda = NULL, type.measure = "deviance", alpha = 1, n = 10)$lambda.min
+si_lasso = glmnet(x = X, y = Y,  alpha = 1, lambda = lambda) 
+coef_lasso = coef(si_lasso)
+lasso = list(name = "coef_lasso", b0 = coef_lasso[1], b = coef_lasso[-1])
+betahat = coef(si_lasso, s=lambda/n)[-1] 
   
 #### Selective inference
 library(selectiveInference)
