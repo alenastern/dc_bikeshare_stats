@@ -17,20 +17,25 @@ library(geojsonsf)
 library(sf)
 library(rjson)
 library(zoo)
+library(glmnet)
+
 
 # Set Working Directory
 
 setwd("/Users/alenastern/Documents/Win2019/MultiTesting/dc_bikeshare_stats/")
 #source(here("src/exploration","get_data.R"))
 #source(here("src/exploration","data_timelags.R"))
-source("src/exploration/get_data.R")
-source("src/exploration/data_timelags.R")
+#source("src/exploration/get_data.R")
+#source("src/exploration/data_timelags.R")
 
 ### Step 0: Prep Final Data for Analysis
 
-#df.final.timelag <- df.final.timelag %>% mutate_all(funs(replace(., is.na(.), 0)))
+df.final.timelags <- read_csv('df_final_timelags.csv')
+df.final.timelags <- df.final.timelags %>% mutate_all(funs(replace(., is.na(.), 0)))
+#df.final.timelags <- df.final.timelags %>% select(-contains("GEOID"))
 
-total_data_panel <- total_data_panel %>% mutate_all(funs(replace(., is.na(.), 0)))
+
+#total_data_panel <- total_data_panel %>% mutate_all(funs(replace(., is.na(.), 0)))
 
 
 ### Step 1: Split Data into Training, Validation, Testing Sets ###
@@ -106,7 +111,7 @@ no_shrinkage_list = c("total_bl", "season_year", "race")
 ns_var_indices <- c()
 for (var in no_shrinkage_list) {
   idx <- grep(var, colnames(Xtrain))
-  var_indices <- append(ns_var_indices, c(idx))
+  ns_var_indices <- append(ns_var_indices, c(idx))
 }
 
 # initializes vector of 1s
