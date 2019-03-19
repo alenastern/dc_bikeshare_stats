@@ -1,17 +1,11 @@
 
 # Selective inference - referencing Rina Barber's Inference on linear regression code ("2/27/2019")
 # Step 0: Pre-processing for* 
-df.final.timelags <- df.final.timelags %>% mutate_all(funs(replace(., is.na(.), 0)))
-df.final.timelags <- df.final.timelags %>% select(-contains("GEOID"))
-
-cols = colnames(df.final.timelags);    
-df.final.timelags[,cols] = apply(df.final.timelags[,cols], 2, function(x) as.numeric(as.character(x)));
 
 #### Code to get X, Y and betas. 
 turn_into_matrix <- function(data, y_var){
   # data = data frame
   # y_var = dependent variable
-  
     X <- data.matrix(data[ , ! colnames(data) %in% c(y_var) ])
     Y <- data.matrix(data[[y_var]])
  
@@ -24,7 +18,7 @@ turn_into_matrix <- function(data, y_var){
   df_list <- turn_into_matrix(df.final.timelags, "n_rides_tot")
   X <- df_list[[1]]
   Y <- df_list[[2]]
-  
+
   lambda = cv.glmnet(x = X, y = Y, lambda = NULL, type.measure = "deviance", alpha = 1, n = 10)$lambda.min
   si_lasso = glmnet(x = X, y = Y,  alpha = 1, lambda = lambda) 
   coef_lasso = coef(si_lasso)

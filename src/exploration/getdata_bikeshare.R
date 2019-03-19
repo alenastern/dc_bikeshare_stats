@@ -2,7 +2,7 @@ library(stringr)
 library(lubridate)
 library(tidyverse)
 library(dplyr)
-
+#setwd("~/Desktop/UChi/Classes/Stats/MultipleTesting_ModernInference/project_bikeshare/dc_bikeshare_stats/src/exploration") #Cris' directory
 setwd('/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/src/exploration/')
 data.grouped = NULL
 

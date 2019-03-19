@@ -18,25 +18,21 @@ library(sf)
 library(rjson)
 library(zoo)
 library(glmnet)
-
+library(grpreg)
 
 # Set Working Directory
 
 setwd("/Users/alenastern/Documents/Win2019/MultiTesting/dc_bikeshare_stats/")
-#source(here("src/exploration","get_data.R"))
-#source(here("src/exploration","data_timelags.R"))
+#setwd('/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/')
 #source("src/exploration/get_data.R")
 #source("src/exploration/data_timelags.R")
 
 ### Step 0: Prep Final Data for Analysis
 
 df.final.timelags <- read_csv('df_final_timelags.csv')
+
+#df.final.timelags <- df.final.timelags[ , ! colnames(df.final.timelags) %in% c('county', '(Intercept)') ]
 df.final.timelags <- df.final.timelags %>% mutate_all(funs(replace(., is.na(.), 0)))
-#df.final.timelags <- df.final.timelags %>% select(-contains("GEOID"))
-
-
-#total_data_panel <- total_data_panel %>% mutate_all(funs(replace(., is.na(.), 0)))
-
 
 ### Step 1: Split Data into Training, Validation, Testing Sets ###
 
@@ -75,20 +71,20 @@ train_test_split <- function(data, y_var, bg){
     train_set = data[data$GEOID %in% train_geo,]
     val_set = data[data$GEOID %in% val_geo,]
     test_set = data[!data$GEOID %in% train_val_geo, ]
-    
-  # Testing Code  
-  # reduce(union, list(unique(as.vector(train_set$GEOID)), unique(as.vector(val_set$GEOID)), unique(as.vector(test_set$GEOID))))
-  # reduce(intersect, list(unique(as.vector(train_set$GEOID)), unique(as.vector(val_set$GEOID)), unique(as.vector(test_set$GEOID))))
-  # identify no GEOIDs in common and 85 in union
-
-    Xtrain <- data.matrix(train_set[ , ! colnames(train_set) %in% c(y_var) ])
+  
+    # seve geoid column for each set
+    train_set_geo <- train_set$GEOID
+    val_set_geo <- val_set$GEOID
+    test_set_geo <- test_set$GEOID
+    geo_list <- c(train_set_geo, val_set_geo, test_set_geo)
+    Xtrain <- data.matrix(train_set[ , ! colnames(train_set) %in% c(y_var, 'GEOID') ])
     ytrain <- data.matrix(train_set[[y_var]])
-    Xval <- data.matrix(val_set[ , ! colnames(val_set) %in% c(y_var) ])
+    Xval <- data.matrix(val_set[ , ! colnames(val_set) %in% c(y_var, 'GEOID') ])
     yval <- data.matrix(val_set[[y_var]])
-    Xtest <- data.matrix(test_set[ , ! colnames(test_set) %in% c(y_var) ])
+    Xtest <- data.matrix(test_set[ , ! colnames(test_set) %in% c(y_var, 'GEOID') ])
     ytest <- data.matrix(test_set[[y_var]])
   }
-  df_list = list(Xtrain, ytrain, Xval, yval, Xtest, ytest)
+  df_list = list(Xtrain, ytrain, Xval, yval, Xtest, ytest, geo_list)
   return(df_list) 
 }
 
@@ -100,12 +96,14 @@ Xval <- df_list[[3]]
 yval <- df_list[[4]]
 Xtest <- df_list[[5]]
 ytest <- df_list[[6]]
+geo_list <- df_list[[7]]
 
 ### Step 2: Set penalty ###
 
 ### Step 2a: find column indices for variables we do not want to apply shrinkage (eg. definitely include these variables in final model)
 
-no_shrinkage_list = c("total_bl", "season_year", "race")
+no_shrinkage_list = c("total_bl", "season_year", "race_white", "race_black", "race_asian", "race_other", "male", "female", "median_age", "age_under18", "age_18to24", "age_25to34", "age_35to44", "age_45to54", "age_55to64", "age_65up", "income_less_than_30k", "income_30to59k", "income_60to99k", "income_100up")
+
 
 # identify indices of 'no-shrinkage' variables
 ns_var_indices <- c()
@@ -129,22 +127,25 @@ groups_bl_type = c("l_cat", "l_name")
 
 
 make_index_list <- function(groups, ns_var_indices, Xtrain){
-  index = seq(1, length(colnames(Xtrain)), by = 1)
-  gp_index_num = length(colnames(Xtrain)) + 1
+  index = rep(NA, length(colnames(Xtrain)))
+  gp_index_num = 1
   for(gp in groups){
     gp_idx <- grep(gp, colnames(Xtrain))
-    replace(index, gp_idx, gp_index_num)
+    index <- replace(index, gp_idx, gp_index_num)
     gp_index_num = gp_index_num + 1
   }
   
-  # don't penalize non-shrinkage vars or intercept
-  index = replace(index, ns_var_indices, NA)
-  index = append(c(NA), index)
+  for(i in 1:length(index)){
+    if (is.na(index[i])){
+      index[i] = gp_index_num
+      gp_index_num = gp_index_num + 1
+    }
+  }
+  
+  # don't penalize non-shrinkage vars
+  index = replace(index, ns_var_indices, 0)
   return(index)
 }
-
-
-#https://cran.r-project.org/web/packages/grplasso/grplasso.pdf
 
 
 ### Step 3a:LR
@@ -187,34 +188,26 @@ reg_path_poisson = cv_poisson$beta
 
 ### Step 3f: Grouped Lasso Linear
 
-# Add intercept to X matrix
-gp_Xtrain = cbind(rep(1, nrow(Xtrain)), Xtrain)
-
 index = make_index_list(groups_bl_type, ns_var_indices, Xtrain)
-lambda_lin <- lambdamax(Xtrain_gp, y = train, index = index, penscale = sqrt,
-                    model = LinReg()) * 0.5^(0:5)
 
-trained_gp_lasso_lin <- grplasso(x = Xtrain_gp, y = ytrain, index = index, lambda = lambda_lin, model = LinReg(),
-                penscale = sqrt,
-                control = grpl.control(update.hess = "lambda", trace = 0))
-coef_gp_lasso_linear = coef(trained_gp_lasso_lin)
-gp_lasso_linear = list(name("coef_gp_lasso_linear", b0 = coef_gp_lasso_linear[1], b = coef_gp_lasso_linear[-1]))
+cvgrlasso = cv.grpreg(Xtrain, ytrain, index, penalty = 'grLasso', family = "gaussian")
+lamb_ = cvgrlasso$lambda.min
+lamb_idx = cvgrlasso$min
+grlasso = cvgrlasso$fit
+reg_path_grlasso = grlasso$beta
+coef_grlasso = reg_path_grlasso[ ,lamb_idx]
+gp_lasso = list(name = "coef_gp_lasso", b0 = coef_grlasso[1], b = coef_grlasso[-1])
 
-## Plot coefficient paths
-plot(fit)
+### Step 3f: Grouped Lasso Linear
 
-### Step 3g: Grouped Lasso Poisson
-lambda_poiss <- lambdamax(x = Xtrain, y = train, index = index, penscale = sqrt,
-                        model = PoissReg()) * 0.5^(0:5)
+cvgrlasso_poisson = cv.grpreg(Xtrain, ytrain, index, penalty = 'grLasso', family = "poisson")
+lamb_ = cvgrlasso_poisson$lambda.min
+lamb_idx = cvgrlasso_poisson$min
+grlasso_poisson = cvgrlasso_poisson$fit
+reg_path_grlasso_poisson = grlasso_poisson$beta
+coef_grlasso_poisson = reg_path_grlasso_poisson[ ,lamb_idx]
+gp_lasso_poisson = list(name = "coef_gp_lasso_poisson", b0 = coef_grlasso_poisson[1], b = coef_grlasso_poisson[-1])
 
-trained_gp_lasso_poiss <- grplasso(x = Xtrain_gp, y = ytrain, index = index, lambda = lambda_poiss, model = PoissReg(),
-                             penscale = sqrt,
-                             control = grpl.control(update.hess = "lambda", trace = 0))
-coef_gp_lasso_poiss = coef(trained_gp_lasso_poiss)
-gp_lasso_poisson = list(name("coef_gp_lasso_poisson", b0 = coef_gp_lasso_poiss[1], b = coef_gp_lasso_poiss[-1]))
-
-## Plot coefficient paths
-plot(fit)
 
 
 ### Step 4: Assess Model on Test Set ###
@@ -235,7 +228,7 @@ plot_resids <- function(residuals, y, predicted, Xdf, var_list) {
   
   d <- cbind(y, predicted, residuals, Xdf)
   d <- data.frame(d)
-  d <- d %>% rename(y = V1, predicted = V2, residuals = V3)
+  d <- d %>% dplyr::rename(y = V1, predicted = V2, residuals = V3)
   var_list <- append(var_list, c("y", "predicted", "residuals"))
   d <- d[var_list]
   
@@ -257,7 +250,7 @@ plot_pi <- function(q90, y, predicted, Xdf, var_list) {
   
   d <- cbind(y, predicted, Xdf)
   d <- data.frame(d)
-  d <- d %>% rename(y = V1, predicted = V2)
+  d <- d %>% dplyr::rename(y = V1, predicted = V2)
   d <- d %>% mutate(upper = predicted + q90, lower = predicted - q90, covered = ifelse(y >= lower & y <= upper, 1, 0))
   d$covered <- factor(d$covered, levels = c(0, 1))
   
@@ -277,11 +270,13 @@ plot_pi <- function(q90, y, predicted, Xdf, var_list) {
 
 model_performance = data.frame()
 index = 0
-#for (model in list(lm, lasso, ridge, elastic_net, poisson, gp_lasso_linear, gp_lasso_poisson)){
-for (model in list(lm)) {
+for (model in list(lasso, ridge, elastic_net, poisson, gp_lasso, gp_lasso_poisson)){
+#for (model in list(lm)) {
   index = index + 1
   model_performance[index, "model"] = model$name
   model_performance[index, "type"] = "non-truncated"
+  
+  print(model$name)
   
   # PI width using training set
   yhat_train = model$b0 + Xtrain%*%model$b 
@@ -321,7 +316,7 @@ for (model in list(lm)) {
   model_performance[index, "cov_train_qval"] = mean(yhat_train - q_val <= ytrain & ytrain <= yhat_train + q_val)
   model_performance[index, "cov_test_qval"] = 	mean(yhat_test - q_val <= ytest & ytest <= yhat_test + q_val)
   
-  var_list = c("n_bl_tot")
+  var_list = c("total_bl")
   
   filename_pr_train = paste("src/analysis/images/", model$name,"_train_pr.png", sep = "")
   plot_resids(resids_train, ytrain, yhat_train, Xtrain, var_list)
