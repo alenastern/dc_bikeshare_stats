@@ -1,3 +1,4 @@
+
 library(lubridate)
 library(tidyverse)
 library(reshape)
@@ -17,7 +18,8 @@ library(geojsonsf)
 library(sf)
 library(rjson)
 library(zoo)
-setwd("~/Desktop/UChi/Classes/Stats/MultipleTesting_ModernInference/project_bikeshare/dc_bikeshare_stats/") #Cris' directory
+#setwd("~/Desktop/UChi/Classes/Stats/MultipleTesting_ModernInference/project_bikeshare/dc_bikeshare_stats/") #Cris' directory
+setwd('/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/')
 
 ### 
 df.final.timelag  <- df.final
@@ -262,7 +264,36 @@ cols = colnames(df.final.timelags);
 df.final.timelags[,cols] = apply(df.final.timelags[,cols], 2, function(x) as.numeric(as.character(x)));
 df.final.timelags <- df.final.timelags %>% mutate_all(funs(replace(., is.na(.), 0)))
 
-df.final.timelags <- df.final.timelags[, colSums(df.final.timelags != 0) > 0]
+df.final.timelags <- df.final.timelags[ , ! colnames(df.final.timelags) %in% c('(Intercept)', 'state', 'county', 'tract', 'block_group') ]
+df.final.timelags.nozero <- df.final.timelags[, colSums(df.final.timelags != 0) > 0]
+
+m <- as.matrix(df.final.timelags.nozero)
+dups <- duplicated(m, MARGIN=2)
+
+df.dups <- df.final.timelags.nozero[,dups]
+
+a <- names(df.dups)
+df.no.dups <- df.final.timelags.nozero[, !colnames(df.final.timelags.nozero) %in% a] # DF WITH NO DUPLICATES
+
+
+# creates dataframe with duplicate columns
+same.cols <- data.frame(matrix(ncol = 2, nrow = 0))
+cols <- c("duplicated.col", "original.col")
+colnames(same.cols) <- cols
+
+for (x in seq_along(a)){
+  col1 <- a[x]
+  b <- df.final.timelags.nozero[-which(colnames(df.final.timelags.nozero)==col1)]
+  c <- names(b)
+  for (y in seq_along(c)){
+    col2 <- c[y]
+    if (all(df.final.timelags[col1] == df.final.timelags[col2]) ){
+      new.dups<-data.frame(col1, col2)
+      names(new.dups)<-cols
+      same.cols <- rbind(same.cols, new.dups)
+    }
+  }
+}
 
 rm(df.final.timelag)
 rm(df.final.timelag_1)
@@ -277,5 +308,31 @@ rm(df.final.timelag_9)
 rm(df.final.timelag_10)
 rm(df.final.timelag_11)
 rm(df.final.timelag_12)
+rm(b)
+rm(df.dups)
+rm(df.final.timelags)
+rm(m)
+rm(new.dups)
+rm(dups)
+rm(a)
+rm(c)
+rm(col1)
+rm(col2)
+rm(cols)
+rm(df.date.dummies)
+rm(f)
+rm(file)
+rm(file_bg)
+rm(i)
+rm(ind)
+rm(l)
+rm(list_of_txts)
+rm(location)
+rm(n)
+rm(new_cols)
+rm(x)
+rm(y)
+rm(z)
 
-write.csv(df.final.timelags, file = "src/exploration/df_final_timelags.csv")
+
+#write.csv(df.final.timelags, file = "src/exploration/df_final_timelags.csv")
