@@ -257,7 +257,6 @@ df.final.timelags <- df.final.timelags %>% select(-contains("date"))
 df.final.timelags <- df.final.timelags %>% select(-("season"))
 df.final.timelags <- df.final.timelags %>% select(-("na.rm"))
 df.final.timelags <- df.final.timelags %>% mutate_all(funs(replace(., is.na(.), 0)))
-df.final.timelags <- df.final.timelags %>% select(-contains("GEOID"))
 
 cols = colnames(df.final.timelags);    
 df.final.timelags[,cols] = apply(df.final.timelags[,cols], 2, function(x) as.numeric(as.character(x)));
@@ -279,4 +278,4 @@ rm(df.final.timelag_10)
 rm(df.final.timelag_11)
 rm(df.final.timelag_12)
 
-write.csv(df.final.timelags, file = "df_final_timelags.csv")
+write.csv(df.final.timelags, file = "src/exploration/df_final_timelags.csv")
