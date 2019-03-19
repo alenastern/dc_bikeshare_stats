@@ -1,3 +1,4 @@
+
 library(lubridate)
 library(reshape)
 library(tidyverse)
@@ -17,10 +18,12 @@ library(geojsonsf)
 library(sf)
 library(rjson)
 library(zoo)
+library(glmnet)
 
 # Set Working Directory
 
-setwd("/Users/alenastern/Documents/Win2019/MultiTesting/dc_bikeshare_stats/")
+#setwd("/Users/alenastern/Documents/Win2019/MultiTesting/dc_bikeshare_stats/")
+setwd('/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/')
 #source(here("src/exploration","get_data.R"))
 #source(here("src/exploration","data_timelags.R"))
 source("src/exploration/get_data.R")
@@ -28,9 +31,7 @@ source("src/exploration/data_timelags.R")
 
 ### Step 0: Prep Final Data for Analysis
 
-#df.final.timelag <- df.final.timelag %>% mutate_all(funs(replace(., is.na(.), 0)))
-
-total_data_panel <- total_data_panel %>% mutate_all(funs(replace(., is.na(.), 0)))
+df.final.timelags <- df.final.timelags %>% mutate_all(funs(replace(., is.na(.), 0)))
 
 
 ### Step 1: Split Data into Training, Validation, Testing Sets ###
@@ -100,7 +101,8 @@ ytest <- df_list[[6]]
 
 ### Step 2a: find column indices for variables we do not want to apply shrinkage (eg. definitely include these variables in final model)
 
-no_shrinkage_list = c("total_bl", "season_year", "race")
+no_shrinkage_list = c("total_bl", "season_year", "race_white", "race_black", "race_asian", "race_other", "male", "female", "median_age", "age_under18", "age_18to24", "age_25to34", "age_35to44", "age_45to54", "age_55to64", "age_65up", "income_less_than_30k", "income_30to59k", "income_60to99k", "income_100up")
+
 
 # identify indices of 'no-shrinkage' variables
 ns_var_indices <- c()
