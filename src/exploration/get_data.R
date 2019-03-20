@@ -5,6 +5,7 @@
 # Working directories: 
 #setwd("/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/") #Alix's directory
 #setwd("~/Desktop/UChi/Classes/Stats/MultipleTesting_ModernInference/project_bikeshare/dc_bikeshare_stats/")
+setwd("/Users/alenastern/Documents/Win2019/MultiTesting/dc_bikeshare_stats/")
 
 # Install the following libraries: 
 library(lubridate)
@@ -29,8 +30,8 @@ library(zoo)
 ################################################################################################################################################
 
 #Run external scripts
-#source("src/exploration/getdata_bikeshare.R") #Based on Rina's code, this is re-factored to get data up to 2015
-#source("src/exploration/ACS data.R")
+source("src/exploration/getdata_bikeshare.R") #Based on Rina's code, this is re-factored to get data up to 2015
+source("src/exploration/ACS data.R")
 
 #--------------------------------- --------------------------------- --------------------------------- #
 #-----------------------------------------------Get data-----------------------------------------------#
@@ -187,12 +188,9 @@ rm(file_location)
 rm(file_t)
 rm(df.acs)
 rm(df.merge.1)
-rm(df.final)
 rm(dummies)
 rm(find.quants)
 rm(locationbikes_sf) # Use this one if we want to plot something geographically
-
-
 rm(bl_bg_all)
 rm(bl_bg_cat)
 rm(biketrips_bg_panel)
