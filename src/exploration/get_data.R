@@ -29,8 +29,8 @@ library(zoo)
 ################################################################################################################################################
 
 #Run external scripts
-source("src/exploration/getdata_bikeshare.R") #Based on Rina's code, this is re-factored to get data up to 2015
-source("src/exploration/ACS data.R")
+#source("src/exploration/getdata_bikeshare.R") #Based on Rina's code, this is re-factored to get data up to 2015
+#source("src/exploration/ACS data.R")
 
 #--------------------------------- --------------------------------- --------------------------------- #
 #-----------------------------------------------Get data-----------------------------------------------#
@@ -41,7 +41,7 @@ file_bg = paste0('https://opendata.arcgis.com/datasets/c143846b7bf4438c954c5bb28
 download.file(file_bg,destfile='neighb_bg.geojson')
 blockgroup_sf =  st_read('neighb_bg.geojson')
 blockgroup_sf <- st_as_sf(blockgroup_sf)
-blockgroup_sf <- blockgroup_sf %>% select(OBJECTID, TRACT, BLKGRP, GEOID, geometry)
+blockgroup_sf <- blockgroup_sf %>% dplyr::select(OBJECTID, TRACT, BLKGRP, GEOID, geometry)
 
 # ---- 2. Read in Basic Business License Data ---- #
 
@@ -109,7 +109,7 @@ bl_bg_cat <- spread(bl_bg_cat, l_cat, nbl_cat, fill = 0, sep = "_")
 
 bl_bg_all <- merge(bl_bg_cat, bl_bg_name, by = c("GEOID", "start_month", "start_year"))
 names(bl_bg_all) <- gsub(" ", "_", names(bl_bg_all))
-bl_bg_all <- bl_bg_all %>% mutate(total_bl = select(., l_cat_Employment_Services:l_cat_Public_Health_Public_Accomm) %>% rowSums(na.rm = TRUE))
+bl_bg_all <- bl_bg_all %>% mutate(total_bl = dplyr::select(., l_cat_Employment_Services:l_cat_Public_Health_Public_Accomm) %>% rowSums(na.rm = TRUE))
 
 # 5.2 Geo-referrenced stations with bike trips:
 stations_latlon$station_id = as.numeric(stations_latlon$station_id)
