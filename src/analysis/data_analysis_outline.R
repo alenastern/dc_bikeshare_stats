@@ -153,7 +153,7 @@ coef_lm = lm(ytrain~Xtrain)$coef
 lm = list(name = "coef_lm", b0 = coef_lm[1], b = coef_lm[-1])
 
 ### Step 3a:Lasso
-cv_lasso = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, type.measure = "deviance", alpha = 1, n = 10)
+cv_lasso = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, type.measure = "deviance", alpha = 1, nfolds = 10)
 lamb_ = cv_lasso$lambda.min
 trained_lasso = glmnet(x = Xtrain, y = ytrain,  alpha = 1, lambda = lamb_) 
 coef_lasso = coef(trained_lasso)
@@ -161,7 +161,7 @@ lasso = list(name = "coef_lasso", b0 = coef_lasso[1], b = coef_lasso[-1])
 reg_path_lasso = cv_lasso$beta
 
 ### Step 3b: Ridge
-cv_ridge = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, type.measure = "deviance", alpha = 0, n = 10)
+cv_ridge = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, type.measure = "deviance", alpha = 0, nfolds = 10)
 lamb_ = cv_ridge$lambda.min
 trained_ridge = glmnet(x = Xtrain, y = ytrain,  alpha = 0, lambda = lamb_) 
 coef_ridge = coef(trained_ridge)
@@ -169,7 +169,7 @@ ridge = list(name = "coef_ridge", b0 = coef_ridge[1], b = coef_ridge[-1])
 reg_path_ridge = cv_ridge$beta
 
 ### Step 3c: Elastic Net
-cv_elastic_net = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, type.measure = "deviance", alpha = 0.5, n = 10)
+cv_elastic_net = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, type.measure = "deviance", alpha = 0.5, nfolds = 10)
 lamb_ = cv_elastic_net$lambda.min
 trained_elastic_net = glmnet(x = Xtrain, y = ytrain,  alpha = 0, lambda = lamb_) 
 coef_elastic_net = coef(trained_elastic_net)
@@ -179,7 +179,7 @@ reg_path_elastic_net = cv_elastic_net$beta
 ### Step 3d: Forward Selection
 
 ### Step 3e: Poisson
-cv_poisson = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, family = "poisson", n = 10)
+cv_poisson = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, family = "poisson", nfolds = 10)
 lamb_ = cv_poisson$lambda.min
 trained_poison = glmnet(Xtrain, ytrain, family = "poisson", lambda = lamb_)
 coef_poisson = coef(trained_poison)
