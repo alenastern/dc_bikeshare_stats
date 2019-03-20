@@ -4,7 +4,7 @@
 
 # Working directories: 
 #setwd("/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/") #Alix's directory
-setwd("~/Desktop/UChi/Classes/Stats/MultipleTesting_ModernInference/project_bikeshare/dc_bikeshare_stats/")
+#setwd("~/Desktop/UChi/Classes/Stats/MultipleTesting_ModernInference/project_bikeshare/dc_bikeshare_stats/")
 
 # Install the following libraries: 
 library(lubridate)
