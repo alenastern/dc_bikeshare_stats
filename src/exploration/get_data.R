@@ -3,7 +3,8 @@
 #       - change working path of variables file on ACS data file, called by this file. 
 
 # Working directories: 
-setwd("/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/") #Alix's directory
+#setwd("/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/") #Alix's directory
+#setwd("~/Desktop/UChi/Classes/Stats/MultipleTesting_ModernInference/project_bikeshare/dc_bikeshare_stats/")
 
 # Install the following libraries: 
 library(lubridate)
@@ -27,6 +28,9 @@ library(rjson)
 library(zoo)
 ################################################################################################################################################
 
+#Run external scripts
+source("src/exploration/getdata_bikeshare.R") #Based on Rina's code, this is re-factored to get data up to 2015
+source("src/exploration/ACS data.R")
 
 #--------------------------------- --------------------------------- --------------------------------- #
 #-----------------------------------------------Get data-----------------------------------------------#
@@ -75,43 +79,26 @@ file_location = paste0('https://opendata.arcgis.com/datasets/a1f7acf65795451d89f
 download.file(file_location, destfile='location_bikes.geojson')
 locationbikes_sf =  st_read('location_bikes.geojson')
 locationbikes_sf = subset(locationbikes_sf, select = c(LATITUDE, LONGITUDE, TERMINAL_NUMBER, ADDRESS))  
-locationbikes_sf <- locationbikes_sf %>% rename("station_id" = "TERMINAL_NUMBER")
+locationbikes_sf <- locationbikes_sf %>% dplyr::rename("station_id" = "TERMINAL_NUMBER")
 
 # ---- 4. Read in bike rides information  ---- #
-# 4.1 Note: running Rina's code 
-source("src/exploration/getdata_bikeshare.R")
-#source(here("getdata_bikeshare.R")) 
 
-# 4.2 Collapse at the month - year level
-# data$date = as.Date(data$Start.date, "%Y-%m-%d %H:%M:%S")
-# data$start_day = day(data$date)
-# data$start_month = month(data$date)
-# data$start_year = year(data$date)
-# data$month_yr <- format(as.Date(data$date),"%Y-%m")
-# data_collapsed <- data %>% group_by(Start.station.number, End.station.number, start_month, start_year, month_yr) %>% summarise(n_rides = n(), avg_duration = mean(Duration))
-
-# 4.3 Used stations
+# Get geographic information about stations on the data for the rides. 
 stations_fr <- data.frame(stations) 
-stations_fr <- stations_fr %>% rename("station_id" = "X1") %>% rename("address" = "X2")
+stations_fr <- stations_fr %>% dplyr::rename("station_id" = "X1") %>% dplyr::rename("address" = "X2")
 stations_latlon = left_join(stations_fr, locationbikes_sf, by = "station_id")
 stations_latlon <- st_as_sf(stations_latlon)
 
 # ---- 5. Join Datasets  ---- #
 
-# 4.1 Buisness Licenses with bloc group areas: 
+# 5.1 Buisness Licenses with bloc group areas: 
 bl_merge_coord <- bl_merge %>% filter(!is.na(LATITUDE))
 bl_sf = st_as_sf(bl_merge_coord, coords = c("LONGITUDE", "LATITUDE"), crs = 4326, agr = "constant")
-
 bl_bg <- st_join(bl_sf, blockgroup_sf, left = TRUE, join = st_within)
-
-bl_bg <- rename(bl_bg, l_name = LICENSECATEGORY, l_cat = LICENSE_CATEGORY_TEXT )
+bl_bg <- dplyr::rename(bl_bg, l_name = LICENSECATEGORY, l_cat = LICENSE_CATEGORY_TEXT )
 
 # set geometry to NULL so spread collapses month/year correctly
 st_geometry(bl_bg) <- NULL
-
-
-#bl_bg_test <- bl_bg %>% group_by(GEOID, start_month, start_year) %>% summarise(n_bl_tot = n())
-
 
 # see codes here: https://dcra.dc.gov/node/514522
 bl_bg_name <- bl_bg %>% group_by(GEOID, start_month, start_year,l_name) %>% summarise(nbl_name = n())
@@ -124,51 +111,57 @@ bl_bg_all <- merge(bl_bg_cat, bl_bg_name, by = c("GEOID", "start_month", "start_
 names(bl_bg_all) <- gsub(" ", "_", names(bl_bg_all))
 bl_bg_all <- bl_bg_all %>% mutate(total_bl = select(., l_cat_Employment_Services:l_cat_Public_Health_Public_Accomm) %>% rowSums(na.rm = TRUE))
 
-#bl_bg_grouped <- bl_bg %>% group_by(GEOID, start_month, start_year) %>% summarise(n_bl = n())
-
-# 4.2 Stations with bike trips:
+# 5.2 Geo-referrenced stations with bike trips:
 stations_latlon$station_id = as.numeric(stations_latlon$station_id)
-# For now, only joining on the "end-station"
+# We join only with end-station. 
 biketrips_collapsed <- left_join(data.grouped, stations_latlon, by = c("End.station.number" = "station_id"), suffix = c(".start", ".end"))
 biketrips_collapsed <- st_as_sf(biketrips_collapsed)
 
-# 4.3 Bike trips with block group levels. 
+# 5.3 Geo-referrenced Bike trips at the block group level 
 biketrips_bg <- st_join(biketrips_collapsed, blockgroup_sf, left = TRUE, join = st_within)
 rm(biketrips_collapsed)
 
-# 4.4 Bike info with Business licenses info; each station is connected to the number of business licences that were provided in the 
+# 5.4 Bike info with Business licenses info; each station is connected to the number of business licences that were provided in the 
 # corresponding geography (within the same bloc group)
 
-biketrips_bg <- as.data.frame(biketrips_bg)
-bl_bg_grouped <- as.data.frame(bl_bg_all)
+biketrips_bg <- as.data.frame(biketrips_bg) # We don't use them as a geometry type anymore.
+bl_bg_grouped <- as.data.frame(bl_bg_all) # We don't use them as a geometry type anymore.
 
 biketrips_bg_panel <- subset(biketrips_bg, select = -c(LATITUDE, LONGITUDE, ADDRESS, OBJECTID, TRACT, BLKGRP, geometry, avg_duration))
 biketrips_bg_panel <- biketrips_bg_panel %>% group_by(start_month, start_year, GEOID) %>% summarise(n_rides_tot = sum(n_rides))
-
 total_data_panel <- left_join(biketrips_bg_panel,bl_bg_grouped,  by = c("GEOID", "start_month", "start_year"))
-
 total_data_panel  <- total_data_panel %>% filter(!is.na(GEOID))
-
 total_data_panel$date <- as.yearmon(paste(total_data_panel$start_year, total_data_panel$start_month), "%Y %m")
 
 # we have 1 row in bl_bg_grouped that is NA and ~7600 rows in biketrips_bg that are null, seems a couple of stationsd didn't merge
 # we believe these stations represent stations outside of metro DC (eg. in VA or MD) 
 
-# RESHAPING 
+# create date and geoid dummies to ensure we have all geoids with bikes in them
+df.date.dummies <- unique(total_data_panel$date)
+df.geoid.dummies <- unique(total_data_panel$GEOID)
+dummies <- expand.grid(date = df.date.dummies, GEOID = df.geoid.dummies)
 
-# We're looking at how many people ride to a station, so keep only End_station as identifier, and group at this level
+# 5.5 Inclusion of ACS data
 
-# total_data_temp <- subset(total_data, select = c(date, n_rides, n_bl, GEOID))
-# total_data_temp_rides <- total_data_temp %>% group_by(date, GEOID) %>% summarise(n_rides_tot = sum(n_rides) )
-# total_data_temp_bl <- total_data_temp %>% group_by(date, GEOID) %>% summarise(n_bl_tot = sum(n_bl))
-# 
-# reshape_nrides <- spread(total_data_temp_rides, key = date, value = n_rides_tot, fill = 0)
-# reshape_bl <- spread(total_data_temp_bl, key = date, value = n_bl_tot, fill = 0)
-# reshaped_all<- left_join(reshape_nrides, reshape_bl, by = c("GEOID"), suffix = c(".nrides", ".nbl"))
+# Merging total data panel and acs data, keeping all geoids. 
+df.merge.1 <- merge(dummies, total_data_panel, by=c("GEOID", "date"), all.x = TRUE)
+df.final <- merge(df.merge.1, df.acs, by=c("GEOID"), all.x = TRUE)
 
-#left_join()
-#reshaped_all has 86 rows when we keep GEOID. This matches the number of unique GEOIDs in biketrips_bg
+# Changing all nas in the file to 0
+df.final[is.na(df.final)] <- 0
 
+# Creating thresholds for gauging critical mass. 
+find.quants <- subset(df.final, total_bl > 0 & total_bl < 2*(mean(df.final$total_bl) + sd(df.final$total_bl)))
+
+q <- as.data.frame(quantile(find.quants$total_bl))
+
+df.final$thresh1 <- 1*(df.final$total_bl > q[1,])
+df.final$thresh2 <- 1*(df.final$total_bl > q[2,])
+df.final$thresh3 <- 1*(df.final$total_bl > q[3,])
+df.final$thresh4 <- 1*(df.final$total_bl > q[4,])
+df.final$thresh5 <- 1*(df.final$total_bl > q[5,])
+
+#write.csv(df.final, "df_final.csv")
 # Clean up environment: 
 rm(biketrips_bg)
 rm(bikenum)
@@ -192,32 +185,17 @@ rm(stations_latlon)
 rm(zipcode)
 rm(file_location)
 rm(file_t)
+rm(df.acs)
+rm(df.merge.1)
+rm(df.final)
+rm(dummies)
+rm(find.quants)
+rm(locationbikes_sf) # Use this one if we want to plot something geographically
 
-# create date and geoid dummies to ensure we have all geoids with bikes in them
-df.date.dummies <- unique(total_data_panel$date)
-df.geoid.dummies <- unique(total_data_panel$GEOID)
-dummies <- expand.grid(date = df.date.dummies, GEOID = df.geoid.dummies)
 
-# pull the ACS data
-# Need to change working directory from within ACS data to be able to pull ACS data
-source("ACS data.R")
-
-# merge total data panel and acs data, keeping all geoids. 
-df.merge.1 <- merge(dummies, total_data_panel, by=c("GEOID", "date"), all.x = TRUE)
-df.final <- merge(df.merge.1, df.acs, by=c("GEOID"), all.x = TRUE)
-
-# change all nas in the file to 0
-df.final[is.na(df.final)] <- 0
-
-find.quants <- subset(df.final, total_bl > 0 & total_bl < 2*(mean(df.final$total_bl) + sd(df.final$total_bl)))
-
-q <- as.data.frame(quantile(find.quants$total_bl))
-
-df.final$thresh1 <- 1*(df.final$total_bl > q[1,])
-df.final$thresh2 <- 1*(df.final$total_bl > q[2,])
-df.final$thresh3 <- 1*(df.final$total_bl > q[3,])
-df.final$thresh4 <- 1*(df.final$total_bl > q[4,])
-df.final$thresh5 <- 1*(df.final$total_bl > q[5,])
-
-#write.csv(df.final, "df_final.csv")
-
+rm(bl_bg_all)
+rm(bl_bg_cat)
+rm(biketrips_bg_panel)
+rm(bl_bg_name)
+rm(data)
+rm(data.grouped)

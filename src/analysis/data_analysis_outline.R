@@ -25,17 +25,20 @@ library(plotmo)
 
 # Set Working Directory
 
-setwd("/Users/alenastern/Documents/Win2019/MultiTesting/dc_bikeshare_stats/")
+setwd("~/Desktop/UChi/Classes/Stats/MultipleTesting_ModernInference/project_bikeshare/dc_bikeshare_stats/") #Cris' directory
+#setwd("/Users/alenastern/Documents/Win2019/MultiTesting/dc_bikeshare_stats/")
 #setwd('/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/')
-#source("src/exploration/get_data.R")
-#source("src/exploration/data_timelags.R")
+source("src/exploration/get_data.R")
+source("src/exploration/data_timelags.R")
 
 ### Step 0: Prep Final Data for Analysis
 
-df.final.timelags <- read_csv('df_final_timelags.csv')
+# df.final.timelags <- read_csv('df_final_timelags.csv')
+
 
 df.final.timelags <- df.final.timelags[ , ! colnames(df.final.timelags) %in% c('county', '(Intercept)', 'tract') ]
 df.final.timelags <- df.final.timelags %>% mutate_all(funs(replace(., is.na(.), 0)))
+df.no.dups <- df.no.dups %>% mutate_all(funs(replace(., is.na(.), 0)))
 
 ### Step 1: Split Data into Training, Validation, Testing Sets ###
 
@@ -92,7 +95,7 @@ train_test_split <- function(data, y_var, bg){
 }
 
 
-df_list <- train_test_split(df.final.timelags, "n_rides_tot", TRUE)
+df_list <- train_test_split(df.no.dups, "n_rides_tot", TRUE)
 Xtrain <- df_list[[1]]
 ytrain <- df_list[[2]]
 Xval <- df_list[[3]]
@@ -163,7 +166,8 @@ coef_lm = lm(ytrain~Xtrain)$coef
 lm = list(name = "coef_lm", b0 = coef_lm[1], b = coef_lm[-1])
 
 ### Step 3a:Lasso
-cv_lasso = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, type.measure = "deviance", alpha = 1, n = 10, penalty.factor = penalty_factor)
+
+cv_lasso = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, type.measure = "deviance", alpha = 1, nfolds = 10, penalty.factor = penalty_factor)
 lamb_ = cv_lasso$lambda.min
 trained_lasso = glmnet(x = Xtrain, y = ytrain,  alpha = 1, lambda = lamb_, penalty.factor = penalty_factor) 
 coef_lasso = coef(trained_lasso)
@@ -175,8 +179,9 @@ non_zero_lasso <- lasso_coef %>%
   filter(s0 > 0) 
 
 
+
 ### Step 3b: Ridge?
-cv_ridge = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, type.measure = "deviance", alpha = 0, n = 10, penalty.factor = penalty_factor)
+cv_ridge = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, type.measure = "deviance", alpha = 0, nfolds = 10, penalty.factor = penalty_factor)
 lamb_ = cv_ridge$lambda.min
 trained_ridge = glmnet(x = Xtrain, y = ytrain,  alpha = 0, lambda = lamb_) 
 coef_ridge = coef(trained_ridge)
@@ -184,7 +189,8 @@ ridge = list(name = "coef_ridge", b0 = coef_ridge[1], b = coef_ridge[-1])
 reg_path_ridge = cv_ridge$beta
 
 ### Step 3c: Elastic Net
-cv_elastic_net = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, type.measure = "deviance", alpha = 0.5, n = 10, penalty.factor = penalty_factor)
+
+cv_elastic_net = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, type.measure = "deviance", alpha = 0.5, nfolds = 10, penalty.factor = penalty_factor)
 lamb_ = cv_elastic_net$lambda.min
 trained_elastic_net = glmnet(x = Xtrain, y = ytrain,  alpha = 0, lambda = lamb_) 
 coef_elastic_net = coef(trained_elastic_net)
@@ -194,7 +200,7 @@ reg_path_elastic_net = cv_elastic_net$beta
 ### Step 3d: Forward Selection
 
 ### Step 3e: Poisson
-cv_poisson = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, family = "poisson", n = 10, penalty.factor = penalty_factor)
+cv_poisson = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, family = "poisson", nfolds = 10, penalty.factor = penalty_factor)
 lamb_ = cv_poisson$lambda.min
 trained_poison = glmnet(Xtrain, ytrain, family = "poisson", lambda = lamb_)
 coef_poisson = coef(trained_poison)
@@ -212,7 +218,6 @@ grlasso = cvgrlasso$fit
 reg_path_grlasso = grlasso$beta
 coef_grlasso = reg_path_grlasso[ ,lamb_idx]
 gp_lasso = list(name = "coef_gp_lasso", b0 = coef_grlasso[1], b = coef_grlasso[-1])
-
 ### Step 3f: Grouped Lasso Linear
 
 cvgrlasso_poisson = cv.grpreg(Xtrain, ytrain, index, penalty = 'grLasso', family = "poisson")
@@ -285,8 +290,9 @@ plot_pi <- function(q90, y, predicted, Xdf, var_list) {
 
 model_performance = data.frame()
 index = 0
-#for (model in list(lasso, ridge, elastic_net, poisson, gp_lasso, gp_lasso_poisson)){
 for (model in list(lasso)) {
+#for (model in list(lm, lasso, ridge, elastic_net, poisson, gp_lasso, gp_lasso_poisson)){
+
   index = index + 1
   model_performance[index, "model"] = model$name
   model_performance[index, "type"] = "non-truncated"
@@ -296,12 +302,12 @@ for (model in list(lasso)) {
   # PI width using training set
   yhat_train = model$b0 + Xtrain%*%model$b 
   resids_train = ytrain - yhat_train # Residuals
-  q_train = quantile(abs(resids_train),0.9)
+  q_train = quantile(abs(resids_train),0.9, na.rm = TRUE)
   
   # PI width using validation set
   yhat_val = model$b0 + Xval%*%model$b
   resids_val = yval - yhat_val # Residuals
-  q_val = quantile(abs(resids_val),0.9)
+  q_val = quantile(abs(resids_val),0.9, na.rm = TRUE)
   
   model_performance[index, "q90_train"] = q_train
   model_performance[index, "q90_val"] = q_val

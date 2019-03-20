@@ -3,7 +3,8 @@ library(lubridate)
 library(tidyverse)
 library(dplyr)
 #setwd("~/Desktop/UChi/Classes/Stats/MultipleTesting_ModernInference/project_bikeshare/dc_bikeshare_stats/src/exploration") #Cris' directory
-setwd('/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/src/exploration/')
+#setwd('/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/src/exploration/')
+
 data.grouped = NULL
 
 for(i in 2010:2015){ #2010:2011 the data goes up to 2017, but the files are extremely large from 2011 onwards - you can decide to just use a subset

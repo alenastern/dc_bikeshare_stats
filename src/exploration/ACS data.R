@@ -4,7 +4,8 @@ library(dplyr)
 
 
 #global variables
-vars <- read.csv("/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/src/exploration/variables.csv") # change to wherever you save variables.csv
+#vars <- read.csv("/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/src/exploration/variables.csv") # change to wherever you save variables.csv
+vars <- read.csv("src/exploration/variables.csv") # change to wherever you save variables.csv
 vars.to.add <- c('state', 'county', 'tract', 'block_group')
 link <- 'https://api.census.gov/data/2015/acs/acs5'
 for_equal <- 'block%20group:*'
