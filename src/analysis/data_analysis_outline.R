@@ -19,6 +19,9 @@ library(rjson)
 library(zoo)
 library(glmnet)
 library(grpreg)
+library(plotmo)
+
+## Q: Why are not all vars w/ penalty.factor = 0 included in model?
 
 # Set Working Directory
 
@@ -31,7 +34,7 @@ setwd("/Users/alenastern/Documents/Win2019/MultiTesting/dc_bikeshare_stats/")
 
 df.final.timelags <- read_csv('df_final_timelags.csv')
 
-#df.final.timelags <- df.final.timelags[ , ! colnames(df.final.timelags) %in% c('county', '(Intercept)') ]
+df.final.timelags <- df.final.timelags[ , ! colnames(df.final.timelags) %in% c('county', '(Intercept)', 'tract') ]
 df.final.timelags <- df.final.timelags %>% mutate_all(funs(replace(., is.na(.), 0)))
 
 ### Step 1: Split Data into Training, Validation, Testing Sets ###
@@ -102,21 +105,28 @@ geo_list <- df_list[[7]]
 
 ### Step 2a: find column indices for variables we do not want to apply shrinkage (eg. definitely include these variables in final model)
 
-no_shrinkage_list = c("total_bl", "season_year", "race_white", "race_black", "race_asian", "race_other", "male", "female", "median_age", "age_under18", "age_18to24", "age_25to34", "age_35to44", "age_45to54", "age_55to64", "age_65up", "income_less_than_30k", "income_30to59k", "income_60to99k", "income_100up")
+no_shrinkage_list = c("total_bl", "season", "race_white", "race_black", "race_asian", "race_other", "^male", "female", "median_age", "age_under18", "age_18to24", "age_25to34", "age_35to44", "age_45to54", "age_55to64", "age_65up", "income_less_than_30k", "income_30to59k", "income_60to99k", "income_100up")
 
 
 # identify indices of 'no-shrinkage' variables
 ns_var_indices <- c()
 for (var in no_shrinkage_list) {
   idx <- grep(var, colnames(Xtrain))
+  print(var)
+  print(colnames(Xtrain)[idx])
+  print(idx)
   ns_var_indices <- append(ns_var_indices, c(idx))
 }
+
+colnames(Xtrain)[ns_var_indices]
 
 # initializes vector of 1s
 penalty_factor <- rep(1, length(colnames(Xtrain)))
 
 # replaces indices corresponding to 'no-shrinkage' variables with 0
 penalty_factor <- replace(penalty_factor, ns_var_indices, 0)
+
+sum(penalty_factor[ns_var_indices])
 
 ### Step 2b: define groups for grouped lasso
 
@@ -153,15 +163,20 @@ coef_lm = lm(ytrain~Xtrain)$coef
 lm = list(name = "coef_lm", b0 = coef_lm[1], b = coef_lm[-1])
 
 ### Step 3a:Lasso
-cv_lasso = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, type.measure = "deviance", alpha = 1, n = 10)
+cv_lasso = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, type.measure = "deviance", alpha = 1, n = 10, penalty.factor = penalty_factor)
 lamb_ = cv_lasso$lambda.min
-trained_lasso = glmnet(x = Xtrain, y = ytrain,  alpha = 1, lambda = lamb_) 
+trained_lasso = glmnet(x = Xtrain, y = ytrain,  alpha = 1, lambda = lamb_, penalty.factor = penalty_factor) 
 coef_lasso = coef(trained_lasso)
 lasso = list(name = "coef_lasso", b0 = coef_lasso[1], b = coef_lasso[-1])
-reg_path_lasso = cv_lasso$beta
+reg_path_lasso = trained_lasso$beta
+lasso_coef <- as.data.frame(as.matrix(reg_path_lasso))
+non_zero_lasso <- lasso_coef %>%
+  rownames_to_column('var') %>%
+  filter(s0 > 0) 
 
-### Step 3b: Ridge
-cv_ridge = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, type.measure = "deviance", alpha = 0, n = 10)
+
+### Step 3b: Ridge?
+cv_ridge = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, type.measure = "deviance", alpha = 0, n = 10, penalty.factor = penalty_factor)
 lamb_ = cv_ridge$lambda.min
 trained_ridge = glmnet(x = Xtrain, y = ytrain,  alpha = 0, lambda = lamb_) 
 coef_ridge = coef(trained_ridge)
@@ -169,7 +184,7 @@ ridge = list(name = "coef_ridge", b0 = coef_ridge[1], b = coef_ridge[-1])
 reg_path_ridge = cv_ridge$beta
 
 ### Step 3c: Elastic Net
-cv_elastic_net = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, type.measure = "deviance", alpha = 0.5, n = 10)
+cv_elastic_net = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, type.measure = "deviance", alpha = 0.5, n = 10, penalty.factor = penalty_factor)
 lamb_ = cv_elastic_net$lambda.min
 trained_elastic_net = glmnet(x = Xtrain, y = ytrain,  alpha = 0, lambda = lamb_) 
 coef_elastic_net = coef(trained_elastic_net)
@@ -179,7 +194,7 @@ reg_path_elastic_net = cv_elastic_net$beta
 ### Step 3d: Forward Selection
 
 ### Step 3e: Poisson
-cv_poisson = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, family = "poisson", n = 10)
+cv_poisson = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, family = "poisson", n = 10, penalty.factor = penalty_factor)
 lamb_ = cv_poisson$lambda.min
 trained_poison = glmnet(Xtrain, ytrain, family = "poisson", lambda = lamb_)
 coef_poisson = coef(trained_poison)
@@ -270,8 +285,8 @@ plot_pi <- function(q90, y, predicted, Xdf, var_list) {
 
 model_performance = data.frame()
 index = 0
-for (model in list(lasso, ridge, elastic_net, poisson, gp_lasso, gp_lasso_poisson)){
-#for (model in list(lm)) {
+#for (model in list(lasso, ridge, elastic_net, poisson, gp_lasso, gp_lasso_poisson)){
+for (model in list(lasso)) {
   index = index + 1
   model_performance[index, "model"] = model$name
   model_performance[index, "type"] = "non-truncated"
