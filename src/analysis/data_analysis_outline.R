@@ -22,18 +22,18 @@ library(grpreg)
 
 # Set Working Directory
 
-setwd("/Users/alenastern/Documents/Win2019/MultiTesting/dc_bikeshare_stats/")
+setwd("~/Desktop/UChi/Classes/Stats/MultipleTesting_ModernInference/project_bikeshare/dc_bikeshare_stats/") #Cris' directory
+#setwd("/Users/alenastern/Documents/Win2019/MultiTesting/dc_bikeshare_stats/")
 #setwd('/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/')
-#source("src/exploration/get_data.R")
-#source("src/exploration/data_timelags.R")
+source("src/exploration/get_data.R")
+source("src/exploration/data_timelags.R")
 
 ### Step 0: Prep Final Data for Analysis
 
-df.final.timelags <- read_csv('df_final_timelags.csv')
+# df.final.timelags <- read_csv('df_final_timelags.csv')
 
 #df.final.timelags <- df.final.timelags[ , ! colnames(df.final.timelags) %in% c('county', '(Intercept)') ]
-df.final.timelags <- df.final.timelags %>% mutate_all(funs(replace(., is.na(.), 0)))
-
+df.no.dups <- df.no.dups %>% mutate_all(funs(replace(., is.na(.), 0)))
 ### Step 1: Split Data into Training, Validation, Testing Sets ###
 
 train_test_split <- function(data, y_var, bg){
@@ -89,7 +89,7 @@ train_test_split <- function(data, y_var, bg){
 }
 
 
-df_list <- train_test_split(df.final.timelags, "n_rides_tot", TRUE)
+df_list <- train_test_split(df.no.dups, "n_rides_tot", TRUE)
 Xtrain <- df_list[[1]]
 ytrain <- df_list[[2]]
 Xval <- df_list[[3]]
@@ -197,7 +197,6 @@ grlasso = cvgrlasso$fit
 reg_path_grlasso = grlasso$beta
 coef_grlasso = reg_path_grlasso[ ,lamb_idx]
 gp_lasso = list(name = "coef_gp_lasso", b0 = coef_grlasso[1], b = coef_grlasso[-1])
-
 ### Step 3f: Grouped Lasso Linear
 
 cvgrlasso_poisson = cv.grpreg(Xtrain, ytrain, index, penalty = 'grLasso', family = "poisson")
@@ -270,7 +269,7 @@ plot_pi <- function(q90, y, predicted, Xdf, var_list) {
 
 model_performance = data.frame()
 index = 0
-for (model in list(lasso, ridge, elastic_net, poisson, gp_lasso, gp_lasso_poisson)){
+for (model in list(lm, lasso, ridge, elastic_net, poisson, gp_lasso, gp_lasso_poisson)){
 #for (model in list(lm)) {
   index = index + 1
   model_performance[index, "model"] = model$name
@@ -281,12 +280,12 @@ for (model in list(lasso, ridge, elastic_net, poisson, gp_lasso, gp_lasso_poisso
   # PI width using training set
   yhat_train = model$b0 + Xtrain%*%model$b 
   resids_train = ytrain - yhat_train # Residuals
-  q_train = quantile(abs(resids_train),0.9)
+  q_train = quantile(abs(resids_train),0.9, na.rm = TRUE)
   
   # PI width using validation set
   yhat_val = model$b0 + Xval%*%model$b
   resids_val = yval - yhat_val # Residuals
-  q_val = quantile(abs(resids_val),0.9)
+  q_val = quantile(abs(resids_val),0.9, na.rm = TRUE)
   
   model_performance[index, "q90_train"] = q_train
   model_performance[index, "q90_val"] = q_val

@@ -15,7 +15,7 @@ turn_into_matrix <- function(data, y_var){
 
 
 #### Running Lasso with cross-validation  
-  df_list <- turn_into_matrix(df.final.timelags, "n_rides_tot")
+  df_list <- turn_into_matrix(df.no.dups, "n_rides_tot")
   X <- df_list[[1]]
   Y <- df_list[[2]]
 
@@ -23,9 +23,15 @@ turn_into_matrix <- function(data, y_var){
   si_lasso = glmnet(x = X, y = Y,  alpha = 1, lambda = lambda) 
   coef_lasso = coef(si_lasso)
   lasso = list(name = "coef_lasso", b0 = coef_lasso[1], b = coef_lasso[-1])
-  betahat = coef(si_lasso, s=lambda/n)[-1] 
-  
-#### Selective inference
+  n = nrow(df.no.dups)
+  p = ncol(df.no.dups)
+  #  betahat = coef(si_lasso, s=lambda/n)[-1] 
+  #  beta_hat  = coef(gfit, s=lambda/n, exact=TRUE)
+  si_lasso = glmnet(x = X, y = Y,  alpha = 1, lambda = lambda/n) 
+  betahat = coef(si_lasso)[-1] 
+  betahat =  as.numeric(glmnet(X,Y,lambda = lambda/n, alpha = 1,intercept=FALSE)$beta) # Is this debiassed version? 
+    
+    #### Selective inference
 library(selectiveInference)
 out = fixedLassoInf(X,Y,betahat,lambda,sigma=1)
 plot(0:1,0:1,type='n',xlim=c(1,p),ylim=range(beta)+c(-1,1),xlab='j',ylab='beta')
