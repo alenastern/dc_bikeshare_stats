@@ -108,13 +108,16 @@ create.dfs <- function(topic, vars.df, vars.df.col, link, for_equal, in_equal_co
   return(df.m)
 }
 
+# make the dataframe
 df <- create.dfs(topics, vars, vars$local, link, for_equal, in_equal_county, in_equal_state, in_equal_tract, key, vars.to.add)
 
+# change the type of most columns to numeric and recreate the dataframe
 keep <- c("name", "county", "state", "tract", "block_group")
 indx <- !(colnames(df) %in% keep)
 df.new <- lapply(df[indx], function(x) as.numeric(as.character(x)))
 df.new <- cbind(df[keep], df.new)
 
+# combine all of the categories that need to be combined.
 df.mutated <- df.new %>%
   mutate(race_white = race_white_alone,
         race_black = race_black_alone,
@@ -135,10 +138,13 @@ df.mutated <- df.new %>%
         income_60to99k = income_60to74.9k + income_75to99.9k,
         income_100up = income_100to124.9k + income_125to149.9k + income_150to199.9k + `income_200k+`)
 
+# keep only certain columns
 df.acs <- df.mutated[, -c(6:80)]
 
+# create the geoid
 df.acs$GEOID <- paste0(df.acs$state, df.acs$county, df.acs$tract, df.acs$block_group)
 
+# remove any created dataframes or variables from the environment
 rm(for_equal)
 rm(in_equal_county)
 rm(in_equal_state)
@@ -153,11 +159,3 @@ rm(df.mutated)
 rm(vars)
 rm(df)
 rm(df.new)
-
-
-
-
-# Race: White non-Hispanic = race_white, Black non-Hispanic = race_black_alone, Asian non-Hispanic = race_asian_alone, Other non-Hispanic. 
-# Income: <$29.9k, $30-59.9k, $60-99.9k, $100k+. 
-# Gender: Male, Female. 
-# Age: Under 18, 18 to 24, 25 to 34, 35 to 44, 45 to 54, 55 to 64, 64+, median age. 
