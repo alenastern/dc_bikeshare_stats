@@ -9,7 +9,6 @@ library(dplyr)
 library(treemapify)
 library(grid)
 library(gridExtra)
-library(ggplot2)
 library(ggmap)
 library(zipcode)
 library(geojsonR)
@@ -19,14 +18,14 @@ library(rjson)
 library(zoo)
 library(glmnet)
 library(grpreg)
-library(plotmo)
+library(car)
 
 ## Q: Why are not all vars w/ penalty.factor = 0 included in model?
 
 # Set Working Directory
 
-setwd("~/Desktop/UChi/Classes/Stats/MultipleTesting_ModernInference/project_bikeshare/dc_bikeshare_stats/") #Cris' directory
-#setwd("/Users/alenastern/Documents/Win2019/MultiTesting/dc_bikeshare_stats/")
+#setwd("~/Desktop/UChi/Classes/Stats/MultipleTesting_ModernInference/project_bikeshare/dc_bikeshare_stats/") #Cris' directory
+setwd("/Users/alenastern/Documents/Win2019/MultiTesting/dc_bikeshare_stats/")
 #setwd('/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/')
 source("src/exploration/get_data.R")
 source("src/exploration/data_timelags.R")
@@ -35,10 +34,10 @@ source("src/exploration/data_timelags.R")
 
 # df.final.timelags <- read_csv('df_final_timelags.csv')
 
-
+df.final.timelags <- df.no.dups
 df.final.timelags <- df.final.timelags[ , ! colnames(df.final.timelags) %in% c('county', '(Intercept)', 'tract') ]
 df.final.timelags <- df.final.timelags %>% mutate_all(funs(replace(., is.na(.), 0)))
-df.no.dups <- df.no.dups %>% mutate_all(funs(replace(., is.na(.), 0)))
+#df.no.dups <- df.no.dups %>% mutate_all(funs(replace(., is.na(.), 0)))
 
 ### Step 1: Split Data into Training, Validation, Testing Sets ###
 
@@ -176,14 +175,14 @@ reg_path_lasso = trained_lasso$beta
 lasso_coef <- as.data.frame(as.matrix(reg_path_lasso))
 non_zero_lasso <- lasso_coef %>%
   rownames_to_column('var') %>%
-  filter(s0 > 0) 
+  filter(s0 != 0) 
 
 
 
-### Step 3b: Ridge?
+### Step 3b: Ridge
 cv_ridge = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, type.measure = "deviance", alpha = 0, nfolds = 10, penalty.factor = penalty_factor)
 lamb_ = cv_ridge$lambda.min
-trained_ridge = glmnet(x = Xtrain, y = ytrain,  alpha = 0, lambda = lamb_) 
+trained_ridge = glmnet(x = Xtrain, y = ytrain,  alpha = 0, lambda = lamb_, penalty.factor = penalty_factor) 
 coef_ridge = coef(trained_ridge)
 ridge = list(name = "coef_ridge", b0 = coef_ridge[1], b = coef_ridge[-1])
 reg_path_ridge = cv_ridge$beta
@@ -192,24 +191,24 @@ reg_path_ridge = cv_ridge$beta
 
 cv_elastic_net = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, type.measure = "deviance", alpha = 0.5, nfolds = 10, penalty.factor = penalty_factor)
 lamb_ = cv_elastic_net$lambda.min
-trained_elastic_net = glmnet(x = Xtrain, y = ytrain,  alpha = 0, lambda = lamb_) 
+trained_elastic_net = glmnet(x = Xtrain, y = ytrain,  alpha = 0, lambda = lamb_, penalty.factor = penalty_factor) 
 coef_elastic_net = coef(trained_elastic_net)
 elastic_net = list(name = "coef_elastic_net", b0 = coef_elastic_net[1], b = coef_elastic_net[-1])
 reg_path_elastic_net = cv_elastic_net$beta
 
-### Step 3d: Forward Selection
-
-### Step 3e: Poisson
+### Step 3d: Poisson
 cv_poisson = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, family = "poisson", nfolds = 10, penalty.factor = penalty_factor)
 lamb_ = cv_poisson$lambda.min
-trained_poison = glmnet(Xtrain, ytrain, family = "poisson", lambda = lamb_)
+trained_poison = glmnet(Xtrain, ytrain, family = "poisson", lambda = lamb_, penalty.factor = penalty_factor)
 coef_poisson = coef(trained_poison)
 poisson = list(name = "coef_poiss", b0 = coef_poisson[1], b = coef_poisson[-1])
 reg_path_poisson = cv_poisson$beta
 
-### Step 3f: Grouped Lasso Linear
+### Step 3e.1: Grouped Lasso Linear (bl group)
 
 index = make_index_list(groups_bl_type, ns_var_indices, Xtrain)
+
+
 
 cvgrlasso = cv.grpreg(Xtrain, ytrain, index, penalty = 'grLasso', family = "gaussian")
 lamb_ = cvgrlasso$lambda.min
@@ -218,7 +217,10 @@ grlasso = cvgrlasso$fit
 reg_path_grlasso = grlasso$beta
 coef_grlasso = reg_path_grlasso[ ,lamb_idx]
 gp_lasso = list(name = "coef_gp_lasso", b0 = coef_grlasso[1], b = coef_grlasso[-1])
-### Step 3f: Grouped Lasso Linear
+
+### Step 3e.2: Grouped Lasso Linear (lag group)
+
+### Step 3f.1: Grouped Lasso Poisson (bl group)
 
 cvgrlasso_poisson = cv.grpreg(Xtrain, ytrain, index, penalty = 'grLasso', family = "poisson")
 lamb_ = cvgrlasso_poisson$lambda.min
@@ -227,7 +229,12 @@ grlasso_poisson = cvgrlasso_poisson$fit
 reg_path_grlasso_poisson = grlasso_poisson$beta
 coef_grlasso_poisson = reg_path_grlasso_poisson[ ,lamb_idx]
 gp_lasso_poisson = list(name = "coef_gp_lasso_poisson", b0 = coef_grlasso_poisson[1], b = coef_grlasso_poisson[-1])
+gp_poisson_coef <- as.data.frame(as.matrix(coef_grlasso_poisson))
+non_zero_gp_poisson <- gp_poisson_coef %>%
+  rownames_to_column('var') %>%
+  filter(V1 != 0) 
 
+### Step 3f.2: Grouped Lasso Poisson (lag) group)
 
 
 ### Step 4: Assess Model on Test Set ###
@@ -290,8 +297,12 @@ plot_pi <- function(q90, y, predicted, Xdf, var_list) {
 
 model_performance = data.frame()
 index = 0
-for (model in list(lasso)) {
-#for (model in list(lm, lasso, ridge, elastic_net, poisson, gp_lasso, gp_lasso_poisson)){
+#for (model in list(lasso)) {
+for (model in list(lm, lasso, ridge, elastic_net, poisson, gp_lasso, gp_lasso_poisson)){
+  if (model$name == 'coef_lm'){
+    model$b[is.na(model$b)] <- 0
+    print(model$b)
+  }
 
   index = index + 1
   model_performance[index, "model"] = model$name
@@ -358,12 +369,157 @@ for (model in list(lasso)) {
 } 
 
 
-### Step 5: Local Hypothesis Testing ###
+### Step 5: Fit Model with Selected Coefficients from Lasso ###
 
-#Q: Not splitting data
-### 5a: fit final model on each local hypothesis (each block group = one hypothesis)
+# subset Xtest to just include variables selected by lasso 
+Xtest_subset <- Xtest[ ,colnames(Xtest) %in% non_zero_lasso$var & !colnames(Xtest) %in% c("l_name_Athletic_Exhibition.7bef", 
+                                                                          "age_65up", 
+                                                                          "female")]
 
-### 5b: use false discovery 
+
+# linear regresion
+lm_subset <- glm(ytest ~ Xtest_subset, family = gaussian())
+summary(lm_subset)
+
+
+
+
+# poisson regression
+poisson_subset <- glm(ytest ~ Xtest_subset, family = poisson())
+summary(poisson_subset)
+
+# Export linear regression results to csv
+coef <- summary(lm_subset)$coefficients[,1]
+std <- summary(lm_subset)$coefficients[,2]
+t <- summary(lm_subset)$coefficients[,3]
+p <- summary(lm_subset)$coefficients[,4]
+lm_out <- cbind(coef, std, t, p)
+write.csv(lm_out, 'lm_result.csv')
+
+
+### Step 6: Pairwise Difference Tests
+
+# test if significant difference between overall lag coefficients
+
+### ALL VARS ###
+linearHypothesis(lm_subset, c("Xtest_subsettotal_bl.1bef", "Xtest_subsettotal_bl.2bef", 
+                              "Xtest_subsettotal_bl.3bef", "Xtest_subsettotal_bl.4bef", 
+                              "Xtest_subsettotal_bl.5bef", "Xtest_subsettotal_bl.6bef",
+                              "Xtest_subsettotal_bl.7bef", "Xtest_subsettotal_bl.8bef",
+                              "Xtest_subsettotal_bl.9bef", "Xtest_subsettotal_bl.10bef",
+                              "Xtest_subsettotal_bl.11bef", "Xtest_subsettotal_bl.12bef"))
+
+### Significant w/out Bonferroni Correction ###
+linearHypothesis(lm_subset, c("Xtest_subsettotal_bl.1bef",  "Xtest_subsettotal_bl.4bef", 
+                              "Xtest_subsettotal_bl.6bef",
+                              "Xtest_subsettotal_bl.7bef", "Xtest_subsettotal_bl.8bef",
+                              "Xtest_subsettotal_bl.10bef"))
+
+# test if significant difference between busines license categories one month prior
+#### ALL VARS ####
+linearHypothesis(lm_subset, c("Xtest_subsetl_cat_Housing:_Transient.1bef", "Xtest_subsetl_name_Consumer_Goods_(Auto_Repair).1bef", 
+                              "Xtest_subsetl_name_Consumer_Goods_(Elect_Repair).1bef", "Xtest_subsetl_name_Grocery_Store.1bef", 
+                              "Xtest_subsetl_name_Motor_Vehicle_Dealer.1bef", "Xtest_subsetl_name_Pet_Shop.1bef",
+                              "Xtest_subsetl_name_Security_Agent_(Person).1bef", "Xtest_subsetl_name_Swimming_Pool.1bef",
+                              "Xtest_subsetl_name_Valet_Parking.1bef"))
+
+#### ALL VARS ####
+linearHypothesis(lm_subset, c("Xtest_subsetl_name_Bed_and_Breakfast.3bef",
+                             "Xtest_subsetl_name_Consumer_Goods_(Elect_Repair).3bef",
+                             "Xtest_subsetl_name_General_Business_Licenses.3bef",
+                             "Xtest_subsetl_name_Hotel.3bef",
+                             "Xtest_subsetl_name_Security_Agency_(Firm).3bef"))
+
+#### ALL VARS ####
+linearHypothesis(lm_subset, c("Xtest_subsetl_cat_Housing:_Transient.4bef",
+                              "Xtest_subsetl_name_Inn_And_Motel.4bef",
+                              "Xtest_subsetl_name_Pesticide_Applicator.4bef",
+                              "Xtest_subsetl_name_Security_Agency_(Firm).4bef",
+                              "Xtest_subsetl_name_Security_Alarm_Dealer.4bef"))
+
+#### ALL VARS ####
+linearHypothesis(lm_subset, c("Xtest_subsetl_name_Consumer_Goods_(Auto_Repair).6bef",
+                              "Xtest_subsetl_name_Cooperative_Association.6bef",
+                              "Xtest_subsetl_name_Grocery_Store.6bef",
+                              "Xtest_subsetl_name_Pet_Shop.6bef",
+                              "Xtest_subsetl_name_Public_Hall.6bef",
+                              "Xtest_subsetl_name_Security_Alarm_Dealer.6bef",
+                              "Xtest_subsetl_name_Valet_Parking.6bef"))
+
+#### ALL VARS ####
+linearHypothesis(lm_subset, c("Xtest_subsetl_cat_Housing:_Transient.7bef",
+                              "Xtest_subsetl_name_Auto_Wash.7bef",
+                              "Xtest_subsetl_name_Consumer_Goods_(Elect_Repair).7bef",
+                              "Xtest_subsetl_name_Hotel.7bef",
+                              "Xtest_subsetl_name_Inn_And_Motel.7bef",
+                              "Xtest_subsetl_name_Pet_Shop.7bef",
+                              "Xtest_subsetl_name_Security_Agency_(Firm).7bef",
+                              "Xtest_subsetl_name_Security_Alarm_Agent.7bef",
+                              "Xtest_subsetl_name_Valet_Parking.7bef"))
+
+#### Significant Vars - Bonferroni ####
+linearHypothesis(lm_subset, c("Xtest_subsetl_name_Consumer_Goods_(Elect_Repair).7bef",
+                              "Xtest_subsetl_name_Security_Agency_(Firm).7bef",
+                              "Xtest_subsetl_name_Valet_Parking.7bef"))
+
+### ALL VARS ###
+linearHypothesis(lm_subset, c("Xtest_subsetl_cat_Housing:_Transient.8bef",
+                              "Xtest_subsetl_name_Dry_Cleaners.8bef",
+                              "Xtest_subsetl_name_General_Business_Licenses.8bef",
+                              "Xtest_subsetl_name_Hotel.8bef",
+                              "Xtest_subsetl_name_Pet_Shop.8bef",
+                              "Xtest_subsetl_name_Restaurant.8bef",
+                              "Xtest_subsetl_name_Security_Agency_(Firm).8bef",
+                              "Xtest_subsetl_name_Security_Alarm_Agent.8bef",
+                              "Xtest_subsetl_name_Security_Alarm_Dealer.8bef",
+                              "Xtest_subsetl_name_Swimming_Pool.8bef"))
+### ALL VARS ###
+linearHypothesis(lm_subset, c("Xtest_subsetl_name_Caterers.9bef",
+                              "Xtest_subsetl_name_Cooperative_Association.9bef",
+                              "Xtest_subsetl_name_Dry_Cleaners.9bef",
+                              "Xtest_subsetl_name_Gen_Contr-Construction_Mngr.9bef",
+                              "Xtest_subsetl_name_Hotel.9bef",
+                              "Xtest_subsetl_name_Public_Hall.9bef",
+                              "Xtest_subsetl_name_Solid_Waste_Vehicle.9bef",
+                              "Xtest_subsetl_name_Swimming_Pool.9bef",
+                              "Xtest_subsetl_name_Valet_Parking.9bef"))
+
+### ALL VARS ###
+linearHypothesis(lm_subset, c("Xtest_subsetl_name_Mechanical_Amusement_Machine.10bef",
+                              "Xtest_subsetl_name_Pet_Shop.10bef",
+                              "Xtest_subsetl_name_Public_Hall.10bef",
+                              "Xtest_subsetl_name_Security_Agency_(Firm).10bef",
+                              "Xtest_subsetl_name_Security_Alarm_Agent.10bef"))
+### ALL VARS ###
+linearHypothesis(lm_subset, c("Xtest_subsetl_cat_Entertainment.11bef",
+                              "Xtest_subsetl_name_Pesticide_Applicator.11bef",
+                              "Xtest_subsetl_name_Public_Hall.11bef",
+                              "Xtest_subsetl_name_Special_Events.11bef"))
+
+### Significant w/ Bonferroni Adjustment ###
+linearHypothesis(lm_subset, c("Xtest_subsetl_cat_Entertainment.11bef",
+                              "Xtest_subsetl_name_Special_Events.11bef"))
+
+
+linearHypothesis(lm_subset, c("Xtest_subsetl_cat_Employment_Services.12bef",
+                              "Xtest_subsetl_name_Barber_Chair.12bef",
+                              "Xtest_subsetl_name_Health_Spa_Sales.12bef",
+                              "Xtest_subsetl_name_Hotel.12bef",
+                              "Xtest_subsetl_name_Motion_Picture_Theatre.12bef",
+                              "Xtest_subsetl_name_Parking_Facility.12bef",
+                              "Xtest_subsetl_name_Special_Events.12bef"))  
+
+linearHypothesis(lm_subset, c("thresh3.6bef",
+                              "thresh4.6bef"))
+
+
+
+
+
+
+
+
+
 
 
 
