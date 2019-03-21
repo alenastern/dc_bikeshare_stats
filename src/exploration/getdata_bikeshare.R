@@ -4,8 +4,10 @@ library(tidyverse)
 library(dplyr)
 #setwd("~/Desktop/UChi/Classes/Stats/MultipleTesting_ModernInference/project_bikeshare/dc_bikeshare_stats/src/exploration") #Cris' directory
 #setwd('/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/src/exploration/')
+setwd("/Users/alenastern/Documents/Win2019/MultiTesting/dc_bikeshare_stats/")
 
 data.grouped = NULL
+stations = NULL # stations[i,1] = station ID for the i-th station, stations[i,2] = station location for the i-th station
 
 for(i in 2010:2015){ #2010:2011 the data goes up to 2017, but the files are extremely large from 2011 onwards - you can decide to just use a subset
   print(i)
@@ -37,7 +39,6 @@ for(i in 2010:2015){ #2010:2011 the data goes up to 2017, but the files are extr
 	  
 	  data.grouped <- rbind(data.grouped, data_collapsed)
 	  
-	  stations = NULL # stations[i,1] = station ID for the i-th station, stations[i,2] = station location for the i-th station
 	  for(i in unique(c(station_start,station_end))){
 	    if(any(data[,4]==i)){
 	      ind = min(which(data[,4]==i))
@@ -50,3 +51,5 @@ for(i in 2010:2015){ #2010:2011 the data goes up to 2017, but the files are extr
 	  }
 	}
 }
+
+stations <- stations[!duplicated(stations), ]

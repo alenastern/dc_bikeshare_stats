@@ -19,7 +19,8 @@ library(sf)
 library(rjson)
 library(zoo)
 #setwd("~/Desktop/UChi/Classes/Stats/MultipleTesting_ModernInference/project_bikeshare/dc_bikeshare_stats/") #Cris' directory
-setwd('/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/')
+#setwd('/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/')
+setwd("/Users/alenastern/Documents/Win2019/MultiTesting/dc_bikeshare_stats/")
 
 ### 
 df.final.timelag  <- df.final
@@ -202,7 +203,7 @@ df.final.timelags <- inner_join(df.final.timelags,  df.final.timelag_10)
 df.final.timelags <- inner_join(df.final.timelags,  df.final.timelag_11)
 df.final.timelags <- inner_join(df.final.timelags,  df.final.timelag_12)
 
-df.final.timelags <- df.final.timelags %>% select(-contains("date_"))
+df.final.timelags <- df.final.timelags %>% dplyr::select(-contains("date_"))
 
 
 df.final.timelags  <- df.final.timelags %>% mutate(totcum_bl_6m =total_bl.1bef + total_bl.2bef +  
@@ -253,11 +254,11 @@ df.final.timelags <- df.final.timelags %>% mutate(season = paste(ifelse(test = (
 mm <- model.matrix(~season, df.final.timelags)
 df.final.timelags <- cbind(df.final.timelags, mm)
 
-df.final.timelags <- df.final.timelags %>% select(-contains('start_month'))
-df.final.timelags <- df.final.timelags %>% select(-contains('start_year'))
-df.final.timelags <- df.final.timelags %>% select(-contains("date"))
-df.final.timelags <- df.final.timelags %>% select(-("season"))
-df.final.timelags <- df.final.timelags %>% select(-("na.rm"))
+df.final.timelags <- df.final.timelags %>% dplyr::select(-contains('start_month'))
+df.final.timelags <- df.final.timelags %>% dplyr::select(-contains('start_year'))
+df.final.timelags <- df.final.timelags %>% dplyr::select(-contains("date"))
+df.final.timelags <- df.final.timelags %>% dplyr::select(-("season"))
+df.final.timelags <- df.final.timelags %>% dplyr::select(-("na.rm"))
 df.final.timelags <- df.final.timelags %>% mutate_all(funs(replace(., is.na(.), 0)))
 
 cols = colnames(df.final.timelags);    
