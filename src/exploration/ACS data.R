@@ -12,7 +12,7 @@ for_equal <- 'block%20group:*'
 in_equal_state <- 'state:11'
 in_equal_county <- 'county:001'
 in_equal_tract <- 'tract:*'
-key <-  '17c33afc69e74a76256559f11768a4005763e816' #CHANGE THIS TO YOUR KEY; format is 'xxxxxxxxxxxxxxx...'
+key <-  '' #CHANGE THIS TO YOUR KEY; format is 'xxxxxxxxxxxxxxx...'
 topics <- c("race", "age", "income")
 
 get_census_data <- function(link, variables, for_equal, in_equal_county, in_equal_state, in_equal_tract, key){
