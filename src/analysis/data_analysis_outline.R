@@ -35,7 +35,7 @@ df.final.timelags <- df.no.dups
 df.final.timelags <- df.final.timelags[ , ! colnames(df.final.timelags) %in% c('county', '(Intercept)', 'tract') ]
 df.final.timelags <- df.final.timelags %>% mutate_all(funs(replace(., is.na(.), 0)))
 
-### Step 1: Split Data into Training, Validation, Testing Sets ###
+### Step 1: Split Data into Training, Validation, Testing Sets ### - we use the blockgroup splitting method in our analysis
 
 train_test_split <- function(data, y_var, bg){
   # data = data frame
@@ -101,7 +101,7 @@ geo_list <- df_list[[7]]
 
 ### Step 2: Set penalty ###
 
-### Step 2a: find column indices for variables we do not want to apply shrinkage (eg. definitely include these variables in final model)
+### Step 2a: find column indices for variables we do not want to apply shrinkage (eg. definitely include these variables in final model) - discussed in methodology section
 
 no_shrinkage_list = c("total_bl", "season", "race_white", "race_black", "race_asian", "race_other", "^male", "female", "median_age", "age_under18", "age_18to24", "age_25to34", "age_35to44", "age_45to54", "age_55to64", "age_65up", "income_less_than_30k", "income_30to59k", "income_60to99k", "income_100up")
 
@@ -127,6 +127,8 @@ penalty_factor <- replace(penalty_factor, ns_var_indices, 0)
 sum(penalty_factor[ns_var_indices])
 
 ### Step 2b: define groups for grouped lasso
+
+## different groups for grouped lasso, discussed in methodology and results sections
 
 groups_time = c("1bef", "2bef", "3bef", "4bef", "5bef", "6bef", "7bef", "8bef", 
            "9bef", "10bef", "11bef", "12bef")
@@ -160,6 +162,7 @@ make_index_list <- function(groups, ns_var_indices, Xtrain){
   return(index)
 }
 
+### Step 3: Data Splitting Analysis, Discussed in Results Section
 
 ### Step 3a:LR
 coef_lm = lm(ytrain~Xtrain)$coef 
@@ -274,7 +277,7 @@ coef_grlasso_poisson = reg_path_grlasso_poisson[ ,lamb_idx]
 gp_lasso_poisson_v2 = list(name = "coef_gp_lasso_poisson_v2l", b0 = coef_grlasso_poisson[1], b = coef_grlasso_poisson[-1])
 
 
-### Step 4: Assess Model on Test Set ###
+### Step 4: Assess Model on Test Set ### - Results displayed in Table 1
 
 ### Step 4a: Assess accuracy in terms of minimizing RMSE 
 
@@ -284,10 +287,9 @@ gp_lasso_poisson_v2 = list(name = "coef_gp_lasso_poisson_v2l", b0 = coef_grlasso
 
 ### Step 4d: Assess coverage of prediction interval on test set
 
-### Step 4e: Plot Residuals for Each Model
+### Step 4e: Plot Residuals for Each Model  - shown in Appendix 6
 
 # inspired by: https://drsimonj.svbtle.com/visualising-residuals
-# not included in paper, see images folder of GitHub repository for results
 
 plot_resids <- function(residuals, y, predicted, Xdf, var_list) {
   
@@ -406,7 +408,7 @@ for (model in list(lm, lasso, ridge, elastic_net, poisson, gp_lasso, gp_lasso_po
 } 
 
 
-### Step 5: Fit Model with Selected Coefficients from Lasso ###
+### Step 5: Fit Model with Selected Coefficients from Lasso ### - Discussed in Results Section
 
 # subset Xtest to just include variables selected by lasso and remove collinear variables
 Xtest_subset <- Xtest[ ,colnames(Xtest) %in% non_zero_lasso$var & !colnames(Xtest) %in% c("l_name_Athletic_Exhibition.7bef", 
@@ -430,7 +432,7 @@ lm_out <- cbind(coef, std, t, p)
 write.csv(lm_out, 'lm_result.csv')
 
 
-### Step 6: Significance Tests
+### Step 6: Significance Tests - Discussed in Results Section
 
 # Test Joint Significance 
 
