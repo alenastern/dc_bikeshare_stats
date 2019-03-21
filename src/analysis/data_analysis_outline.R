@@ -20,24 +20,20 @@ library(glmnet)
 library(grpreg)
 library(car)
 
-## Q: Why are not all vars w/ penalty.factor = 0 included in model?
 
 # Set Working Directory
 
 #setwd("~/Desktop/UChi/Classes/Stats/MultipleTesting_ModernInference/project_bikeshare/dc_bikeshare_stats/") #Cris' directory
-setwd("/Users/alenastern/Documents/Win2019/MultiTesting/dc_bikeshare_stats/")
+#setwd("/Users/alenastern/Documents/Win2019/MultiTesting/dc_bikeshare_stats/")
 #setwd('/mnt/dm-3/alix/Documents/Multiple Testing/dc_bikeshare_stats/')
 source("src/exploration/get_data.R")
 source("src/exploration/data_timelags.R")
 
 ### Step 0: Prep Final Data for Analysis
 
-# df.final.timelags <- read_csv('df_final_timelags.csv')
-
 df.final.timelags <- df.no.dups
 df.final.timelags <- df.final.timelags[ , ! colnames(df.final.timelags) %in% c('county', '(Intercept)', 'tract') ]
 df.final.timelags <- df.final.timelags %>% mutate_all(funs(replace(., is.na(.), 0)))
-#df.no.dups <- df.no.dups %>% mutate_all(funs(replace(., is.na(.), 0)))
 
 ### Step 1: Split Data into Training, Validation, Testing Sets ###
 
@@ -137,8 +133,13 @@ groups_time = c("1bef", "2bef", "3bef", "4bef", "5bef", "6bef", "7bef", "8bef",
 
 groups_bl_type = c("l_cat", "l_name")
 
+groups_bl_type_v2 = c("l_name")
 
+# function to create index parameter for grouped lasso
 make_index_list <- function(groups, ns_var_indices, Xtrain){
+  # groups = list of groups
+  # ns_var_indices = indices of variables to not penalize
+  # Xtrain = training features
   index = rep(NA, length(colnames(Xtrain)))
   gp_index_num = 1
   for(gp in groups){
@@ -177,8 +178,6 @@ non_zero_lasso <- lasso_coef %>%
   rownames_to_column('var') %>%
   filter(s0 != 0) 
 
-
-
 ### Step 3b: Ridge
 cv_ridge = cv.glmnet(x = Xtrain, y = ytrain, lambda = NULL, type.measure = "deviance", alpha = 0, nfolds = 10, penalty.factor = penalty_factor)
 lamb_ = cv_ridge$lambda.min
@@ -206,11 +205,12 @@ reg_path_poisson = cv_poisson$beta
 
 ### Step 3e.1: Grouped Lasso Linear (bl group)
 
-index = make_index_list(groups_bl_type, ns_var_indices, Xtrain)
+index_bl = make_index_list(groups_bl_type, ns_var_indices, Xtrain)
+index_time = make_index_list(groups_time, ns_var_indices, Xtrain)
+index_bl2 = make_index_list(groups_bl_type_v2, ns_var_indices, Xtrain)
 
 
-
-cvgrlasso = cv.grpreg(Xtrain, ytrain, index, penalty = 'grLasso', family = "gaussian")
+cvgrlasso = cv.grpreg(Xtrain, ytrain, index_bl, penalty = 'grLasso', family = "gaussian")
 lamb_ = cvgrlasso$lambda.min
 lamb_idx = cvgrlasso$min
 grlasso = cvgrlasso$fit
@@ -220,9 +220,28 @@ gp_lasso = list(name = "coef_gp_lasso", b0 = coef_grlasso[1], b = coef_grlasso[-
 
 ### Step 3e.2: Grouped Lasso Linear (lag group)
 
+cvgrlasso = cv.grpreg(Xtrain, ytrain, index_time, penalty = 'grLasso', family = "gaussian")
+lamb_ = cvgrlasso$lambda.min
+lamb_idx = cvgrlasso$min
+grlasso = cvgrlasso$fit
+reg_path_grlasso = grlasso$beta
+coef_grlasso = reg_path_grlasso[ ,lamb_idx]
+gp_lasso_time = list(name = "coef_gp_lasso_time", b0 = coef_grlasso[1], b = coef_grlasso[-1])
+### Step 3f: Grouped Lasso Linear
+
+### Step 3e.3: Grouped Lasso Linear (bl group just name)
+
+cvgrlasso = cv.grpreg(Xtrain, ytrain, index_bl2, penalty = 'grLasso', family = "gaussian")
+lamb_ = cvgrlasso$lambda.min
+lamb_idx = cvgrlasso$min
+grlasso = cvgrlasso$fit
+reg_path_grlasso = grlasso$beta
+coef_grlasso = reg_path_grlasso[ ,lamb_idx]
+gp_lasso_v2 = list(name = "coef_gp_lasso_v2", b0 = coef_grlasso[1], b = coef_grlasso[-1])
+
 ### Step 3f.1: Grouped Lasso Poisson (bl group)
 
-cvgrlasso_poisson = cv.grpreg(Xtrain, ytrain, index, penalty = 'grLasso', family = "poisson")
+cvgrlasso_poisson = cv.grpreg(Xtrain, ytrain, index_bl, penalty = 'grLasso', family = "poisson")
 lamb_ = cvgrlasso_poisson$lambda.min
 lamb_idx = cvgrlasso_poisson$min
 grlasso_poisson = cvgrlasso_poisson$fit
@@ -234,7 +253,25 @@ non_zero_gp_poisson <- gp_poisson_coef %>%
   rownames_to_column('var') %>%
   filter(V1 != 0) 
 
-### Step 3f.2: Grouped Lasso Poisson (lag) group)
+### Step 3f.2: Grouped Lasso Poisson (lag group)
+
+cvgrlasso_poisson = cv.grpreg(Xtrain, ytrain, index_time, penalty = 'grLasso', family = "poisson")
+lamb_ = cvgrlasso_poisson$lambda.min
+lamb_idx = cvgrlasso_poisson$min
+grlasso_poisson = cvgrlasso_poisson$fit
+reg_path_grlasso_poisson = grlasso_poisson$beta
+coef_grlasso_poisson = reg_path_grlasso_poisson[ ,lamb_idx]
+gp_lasso_poisson_time = list(name = "coef_gp_lasso_poisson_time", b0 = coef_grlasso_poisson[1], b = coef_grlasso_poisson[-1])
+
+### Step 3f.3: Grouped Lasso Poisson (bl group just name)
+
+cvgrlasso_poisson = cv.grpreg(Xtrain, ytrain, index_bl2, penalty = 'grLasso', family = "poisson")
+lamb_ = cvgrlasso_poisson$lambda.min
+lamb_idx = cvgrlasso_poisson$min
+grlasso_poisson = cvgrlasso_poisson$fit
+reg_path_grlasso_poisson = grlasso_poisson$beta
+coef_grlasso_poisson = reg_path_grlasso_poisson[ ,lamb_idx]
+gp_lasso_poisson_v2 = list(name = "coef_gp_lasso_poisson_v2l", b0 = coef_grlasso_poisson[1], b = coef_grlasso_poisson[-1])
 
 
 ### Step 4: Assess Model on Test Set ###
@@ -250,6 +287,7 @@ non_zero_gp_poisson <- gp_poisson_coef %>%
 ### Step 4e: Plot Residuals for Each Model
 
 # inspired by: https://drsimonj.svbtle.com/visualising-residuals
+# not included in paper, see images folder of GitHub repository for results
 
 plot_resids <- function(residuals, y, predicted, Xdf, var_list) {
   
@@ -297,7 +335,6 @@ plot_pi <- function(q90, y, predicted, Xdf, var_list) {
 
 model_performance = data.frame()
 index = 0
-#for (model in list(lasso)) {
 for (model in list(lm, lasso, ridge, elastic_net, poisson, gp_lasso, gp_lasso_poisson)){
   if (model$name == 'coef_lm'){
     model$b[is.na(model$b)] <- 0
@@ -371,18 +408,14 @@ for (model in list(lm, lasso, ridge, elastic_net, poisson, gp_lasso, gp_lasso_po
 
 ### Step 5: Fit Model with Selected Coefficients from Lasso ###
 
-# subset Xtest to just include variables selected by lasso 
+# subset Xtest to just include variables selected by lasso and remove collinear variables
 Xtest_subset <- Xtest[ ,colnames(Xtest) %in% non_zero_lasso$var & !colnames(Xtest) %in% c("l_name_Athletic_Exhibition.7bef", 
                                                                           "age_65up", 
                                                                           "female")]
 
-
 # linear regresion
 lm_subset <- glm(ytest ~ Xtest_subset, family = gaussian())
 summary(lm_subset)
-
-
-
 
 # poisson regression
 poisson_subset <- glm(ytest ~ Xtest_subset, family = poisson())
@@ -397,9 +430,9 @@ lm_out <- cbind(coef, std, t, p)
 write.csv(lm_out, 'lm_result.csv')
 
 
-### Step 6: Pairwise Difference Tests
+### Step 6: Significance Tests
 
-# test if significant difference between overall lag coefficients
+# Test Joint Significance 
 
 ### ALL VARS ###
 linearHypothesis(lm_subset, c("Xtest_subsettotal_bl.1bef", "Xtest_subsettotal_bl.2bef", 
@@ -415,7 +448,31 @@ linearHypothesis(lm_subset, c("Xtest_subsettotal_bl.1bef",  "Xtest_subsettotal_b
                               "Xtest_subsettotal_bl.7bef", "Xtest_subsettotal_bl.8bef",
                               "Xtest_subsettotal_bl.10bef"))
 
-# test if significant difference between busines license categories one month prior
+# Test pairwise difference of means
+linearHypothesis(lm_subset, "Xtest_subsettotal_bl.1bef - Xtest_subsettotal_bl.4bef")
+linearHypothesis(lm_subset, "Xtest_subsettotal_bl.1bef - Xtest_subsettotal_bl.6bef")
+linearHypothesis(lm_subset, "Xtest_subsettotal_bl.1bef - Xtest_subsettotal_bl.7bef")
+linearHypothesis(lm_subset, "Xtest_subsettotal_bl.1bef - Xtest_subsettotal_bl.8bef")
+linearHypothesis(lm_subset, "Xtest_subsettotal_bl.1bef - Xtest_subsettotal_bl.9bef")
+linearHypothesis(lm_subset, "Xtest_subsettotal_bl.1bef - Xtest_subsettotal_bl.10bef")
+linearHypothesis(lm_subset, "Xtest_subsettotal_bl.4bef - Xtest_subsettotal_bl.6bef")
+linearHypothesis(lm_subset, "Xtest_subsettotal_bl.4bef - Xtest_subsettotal_bl.7bef")
+linearHypothesis(lm_subset, "Xtest_subsettotal_bl.4bef - Xtest_subsettotal_bl.8bef")
+linearHypothesis(lm_subset, "Xtest_subsettotal_bl.4bef - Xtest_subsettotal_bl.9bef")
+linearHypothesis(lm_subset, "Xtest_subsettotal_bl.4bef - Xtest_subsettotal_bl.10bef")
+linearHypothesis(lm_subset, "Xtest_subsettotal_bl.6bef - Xtest_subsettotal_bl.7bef")
+linearHypothesis(lm_subset, "Xtest_subsettotal_bl.6bef - Xtest_subsettotal_bl.8bef")
+linearHypothesis(lm_subset, "Xtest_subsettotal_bl.6bef - Xtest_subsettotal_bl.9bef")
+linearHypothesis(lm_subset, "Xtest_subsettotal_bl.6bef - Xtest_subsettotal_bl.10bef")
+linearHypothesis(lm_subset, "Xtest_subsettotal_bl.7bef - Xtest_subsettotal_bl.8bef")
+linearHypothesis(lm_subset, "Xtest_subsettotal_bl.7bef - Xtest_subsettotal_bl.9bef")
+linearHypothesis(lm_subset, "Xtest_subsettotal_bl.7bef - Xtest_subsettotal_bl.10bef")
+linearHypothesis(lm_subset, "Xtest_subsettotal_bl.8bef - Xtest_subsettotal_bl.9bef")
+linearHypothesis(lm_subset, "Xtest_subsettotal_bl.8bef - Xtest_subsettotal_bl.10bef")
+linearHypothesis(lm_subset, "Xtest_subsettotal_bl.9bef - Xtest_subsettotal_bl.10bef")
+
+
+# Test joint significance of bl variables in each month lag
 #### ALL VARS ####
 linearHypothesis(lm_subset, c("Xtest_subsetl_cat_Housing:_Transient.1bef", "Xtest_subsetl_name_Consumer_Goods_(Auto_Repair).1bef", 
                               "Xtest_subsetl_name_Consumer_Goods_(Elect_Repair).1bef", "Xtest_subsetl_name_Grocery_Store.1bef", 
@@ -513,10 +570,14 @@ linearHypothesis(lm_subset, c("thresh3.6bef",
                               "thresh4.6bef"))
 
 
+### Pairwise tests of significant variables in a given lag
 
-
-
-
+#### Significant Vars - Bonferroni ####
+linearHypothesis(lm_subset, "Xtest_subsetl_name_Consumer_Goods_(Elect_Repair).7bef = Xtest_subsetl_name_Security_Agency_(Firm).7bef")
+linearHypothesis(lm_subset, "Xtest_subsetl_name_Consumer_Goods_(Elect_Repair).7bef = Xtest_subsetl_name_Valet_Parking.7bef")
+linearHypothesis(lm_subset, "Xtest_subsetl_name_Security_Agency_(Firm).7bef = Xtest_subsetl_name_Valet_Parking.7bef")
+linearHypothesis(lm_subset, "Xtest_subsetl_cat_Entertainment.11bef = Xtest_subsetl_name_Special_Events.11bef")
+                          
 
 
 
